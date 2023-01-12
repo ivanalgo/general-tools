@@ -2,9 +2,9 @@
 #!/opt/miniconda2/bin/python
 
 #
-# As we know, linux diagnos tools such as top and atop use /proc/stat pseudo file to
+# As we know, linux diagnostic tools such as top and atop use /proc/stat pseudo file to
 # reprot the CPU usage for the whole system.
-# But we need some problem that /proc/stat does not always report the accurate CPU
+# But we met a problem that /proc/stat does not always report the accurate CPU
 # usage for each CPU. So I write the program the verify the correctness of /proc/stat
 # file.
 #
@@ -18,8 +18,8 @@
 # cpu4 737611715 337044965 351556453 7956195981 2388532 0 5251331 0 0 0
 # cpu5 711146154 338943196 336672211 7996663252 2379988 0 5334267 0 0 0
 #
-# field 0: cpu means this line record the cpu time of all CPU(s),  while cpu<n> means
-#          this line record the cpu time for CPU-n
+# field 0: "cpu" means this line records the cpu time of all CPU(s),  while "cpu<n>" means
+#          this line records the cpu time for CPU-n
 # field 1:  user        time in the unit of 10ms
 # field 2:  nice        time in the unit of 10ms
 # field 3:  system      time in the unit of 10ms
@@ -37,7 +37,7 @@
 # 2. Read fields from the first to the tenth
 # 3. sum all fields into a SUM result
 # 4. The ideal SUM should be 100 (1 second has 100 units of 10ms) * CPU * INTERVAL
-# 5. Check whether the SUM within  an error of 5%
+# 5. Check whether the SUM within an error of 5%
 #
 
 import time
