@@ -1,5 +1,5 @@
-#!/bin/python
-#!/opt/miniconda2/bin/python
+#!/bin/python2
+#!/opt/miniconda2/bin/python2
 
 #
 # As we know, linux diagnostic tools such as top and atop use /proc/stat pseudo file to
