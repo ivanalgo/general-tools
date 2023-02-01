@@ -31,10 +31,14 @@
 # field 9:  guest       time in the unit of 10ms
 # field 10: guest_nice  time in the unit of 10ms
 #
+# Note:
+#  1. user time contains the guest time
+#  2. nice time contains the guest_nice time
+#
 #
 # Checking algorithm:
 # 1. Read the line of all CPU(s) time which starts with the "cpu" tokens in an INTERVAL time
-# 2. Read fields from the first to the tenth
+# 2. Read fields from the first to the eighth (because user contains guest and nice contains guest_nice)
 # 3. sum all fields into a SUM result
 # 4. The ideal SUM should be 100 (1 second has 100 units of 10ms) * CPU * INTERVAL
 # 5. Check whether the SUM within an error of 5%
@@ -48,7 +52,7 @@ import os
 PROC_STAT = "/proc/stat"
 CPUS = multiprocessing.cpu_count()
 SLEEP = 10 # in second
-FIELDS = 10
+SUM_FIELDS = 8
 
 def read_proc_stat():
     f = open(PROC_STAT)
@@ -70,11 +74,11 @@ while True:
     time.sleep(SLEEP)
     next_times = read_proc_stat()
 
-    for i in range(0, FIELDS):
+    for i in range(0, SUM_FIELDS):
         diff_times[i] = int(next_times[i]) - int(previous_times[i])
 
     diffs = 0
-    for i in range(0, FIELDS):
+    for i in range(0, SUM_FIELDS):
         diffs += diff_times[i]
 
     if diffs < (CPUS * SLEEP * 100 * 0.95) or diffs > (CPUS * SLEEP * 100 * 1.05):
