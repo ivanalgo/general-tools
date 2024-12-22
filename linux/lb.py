@@ -2,16 +2,13 @@
 
 import re
 
-
 def get_cpu_ids():
     with open("/proc/cpuinfo", "r") as f:
         return [int(line.split(":")[1].strip()) for line in f if line.strip().startswith("processor")]
 
-
 def parse_bitmap(bitmap_str):
     # remove ',' and covert hex to dec
     return [i for i in range(1024) if (int(bitmap_str.replace(',', ''), 16) >> i) & 1]
-
 
 def read_schedstat_and_parse():
     sched_domains = {}
@@ -21,9 +18,8 @@ def read_schedstat_and_parse():
                 if line.startswith(domain):
                     bitmap_str = line.split()[1]
                     set_bits = parse_bitmap(bitmap_str)
-                    sched_domains.setdefault(domain, set()).add(tuple(set_bits))
+                    sched_domains.setdefault(domain, set()).add(tuple(sorted(set_bits)))
     return sched_domains
-
 
 # get all cpu ids
 cpu_ids = get_cpu_ids()
@@ -47,21 +43,24 @@ for cpu in cpu_ids:
 # Parse /proc/schedstat and generate sched domain information
 sched_domains = read_schedstat_and_parse()
 
-# output load of sched domains in each level
+# print sched domain topology
+print("Sched domain topo:")
 for domain, bit_sets in sched_domains.items():
     print(f"{domain}", end=" ")
-    for bit_set in bit_sets:
-        load_sum = sum(cfs_loads.get(bit, 0) for bit in bit_set)
-        print(f"{load_sum} ", end="")
+    sorted_bit_sets = sorted(bit_sets, key=lambda x: x[0])
+    for bit_set in sorted_bit_sets:
+        print(f"[{', '.join(map(str, bit_set))}]", end=" ")
     print()
 
+print()
+print("Sched domain load:")
 # output load of CPU(s) which are organized by sched domain
 for bit_sets in sched_domains["domain1"]:
     print("{", end="")
     printed_list = []
     for bit in bit_sets:
         if bit not in printed_list:
-            for domain0_bit_sets in sched_domains["domain0"]:
+            for domain0_bit_sets in sorted(sched_domains["domain0"], key=lambda x: x[0]):
                 if bit in domain0_bit_sets:
                     print("(", end="")
                     for d0_bit in domain0_bit_sets:
@@ -69,3 +68,11 @@ for bit_sets in sched_domains["domain1"]:
                         printed_list.append(d0_bit)
                     print(")", end="")
     print("}")
+
+# output load of sched domains in each level
+for domain, bit_sets in sched_domains.items():
+    print(f"{domain}", end=" ")
+    for bit_set in bit_sets:
+        load_sum = sum(cfs_loads.get(bit, 0) for bit in bit_set)
+        print(f"{load_sum} ", end="")
+    print()
