@@ -1,76 +1,62 @@
+#!/usr/bin/env python3
+
 import os
 import re
 
-cgroup_dir = "/sys/fs/cgroup/memory/"
+cgroup_dir = "/sys/fs/cgroup/"
 is_cgroup_v2 = os.path.exists(os.path.join(cgroup_dir, "cgroup.controllers"))
 
-if not is_cgroup_v2:
-    files = ['limit_in_bytes', 'usage_in_bytes', 'soft_limit_in_bytes']
-    names = ['limit', 'usage', 'softlimit', 'cache', 'rss']
-else:
-    files = ['max', "high", "low", "min", "current"]
-    names = ['max', 'high', 'low', 'min', 'usage', 'cache', 'rss']
+class Item:
+    def __init__(self, show_name, file, field_in_file = None):
+       self.show_name = show_name
+       self.file = file
+       self.field_in_file = field_in_file
 
-def parse_memory_stat_file(file_path):
-    """
-    解析 memory.stat 文件，提取 'cache' 和 'rss' 数据。
+    def get_file_value(file):
+    	with open(file, "r") as f:
+            return f.read().strip()
 
-    参数:
-        file_path (str): memory.stat 文件的路径。
-
-    返回:
-        dict: 包含 'cache' 和 'rss' 数据的字典，例如:
-              {"cache": 123456, "rss": 789012}
-    """
-    result = {"cache": None, "rss": None}
-    
-    try:
-        with open(file_path, "r") as file:
-            for line in file:
+    def get_field_in_file(file, field):
+    	with open(file, "r") as f:
+            for line in f:
                 # 按空格拆分行
                 parts = line.strip().split()
-                if len(parts) == 2:
-                    key, value = parts
-                    if key in result:
-                        result[key] = int(value)
-    except FileNotFoundError:
-        print(f"Error: File {file_path} not found.")
-    except ValueError as e:
-        print(f"Error: Failed to parse file {file_path}: {e}")
-    
-    return result
+                if len(parts) == 2 and parts[0] == field:
+                    return parts[1]
 
-def parse_memory_info_v1(cgroup_path):
-    """解析 cgroup v1 的内存信息"""
-    memory_stat = {}
-    #files = ['limit_in_bytes', 'usage_in_bytes', 'soft_limit_in_bytes']
-    #names = ['limit', 'usage', 'softlimit']
+    def get_field_vale(self, dir_path):
+    	if self.field_in_file is None:
+    		return Item.get_file_value(os.path.join(dir_path, self.file))
+    	else:
+    		return Item.get_field_in_file(os.path.join(dir_path, self.file), self.field_in_file)
 
-    for key in range(len(files)):
-        try:
-            with open(os.path.join(cgroup_path, f"memory.{files[key]}"), "r") as f:
-                memory_stat[names[key]] = int(f.read().strip())
-        except FileNotFoundError:
-            memory_stat[key] = None
-    return memory_stat
+    def get_showname(self):
+    	return self.show_name;
+        
 
-def parse_memory_info_v2(cgroup_path):
-    """解析 cgroup v2 的内存信息"""
-    memory_stat = {}
-    #files = ['max', "high", "low", "min", "current"]
-    #names = ['max', 'high', 'low', 'min', 'usage']
-
-    for key in range(len(files)):
-        try:
-            with open(os.path.join(cgroup_path, f"memory.{files[key]}"), "r") as f:
-                memory_stat[names[key]] = int(f.read().strip())
-        except FileNotFoundError:
-            memory_stat[key] = None
-    return memory_stat
+if not is_cgroup_v2:
+    items = [
+    	Item('limit', 'limit_in_bytes'),
+    	Item('usage', 'usage_in_bytes'),
+    	Item('softlimit', 'soft_limit_in_bytes'),
+    	Item('cache', 'memory.stat', 'cache'),
+    	Item('rss', 'memory.stat', 'rss')
+    ]
+else:
+    items = [
+    	Item('max', 'memory.max'),
+    	Item('high', 'memory.high'),
+    	Item('low', 'memory.low'),
+    	Item('min', 'memory.min'),
+    	Item('file', 'memory.stat', 'file'),
+    	Item('anon', 'memory.stat', 'anon')
+    ]
 
 def conver_num_to_readable(bytes):
-    if bytes == 9223372036854771712:
+    if bytes == "max":
         return "max"
+
+    bytes = int(bytes)
 
     if bytes >= 1024 * 1024 * 1024:
         return f"{bytes/1024/1024/1024:.2f}G"
@@ -100,7 +86,7 @@ def calculate_max_width(base_path, prefix=""):
             max_width = max(max_width, calculate_max_width(entry_path, prefix + "  "))
     return max_width
 
-def analyze_cgroup_memory(base_path, prefix, max_width):
+def analyze_cgroup_memory(base_path, prefix, max_width, cgroup_v2):
     """递归分析 cgroup 目录，输出内存信息"""
     try:
         entries = os.listdir(base_path)
@@ -108,20 +94,15 @@ def analyze_cgroup_memory(base_path, prefix, max_width):
         print(f"Path {base_path} not found.")
         return
 
-    is_cgroup_v2 = os.path.exists(os.path.join(base_path, "cgroup.controllers"))
     for entry in entries:
         entry_path = os.path.join(base_path, entry)
         if os.path.isdir(entry_path):
-            # 读取 cgroup 的内存信息
-            if is_cgroup_v2:
-                memory_info = parse_memory_info_v2(entry_path)
-            else:
-                memory_info = parse_memory_info_v1(entry_path)
+            memory_info = {}
+            for item in items:
+                value = item.get_field_vale(entry_path)
+                name = item.get_showname()
 
-            memory_stat = parse_memory_stat_file(entry_path + "/memory.stat")
-            # Append memoyr_stat to memory_info
-            for key, value in memory_stat.items():
-                memory_info[key] = value
+                memory_info[name] = value 
 
             # 打印 cgroup 信息
             entry = f"{prefix}{entry}"
@@ -131,15 +112,20 @@ def analyze_cgroup_memory(base_path, prefix, max_width):
             print('')
 
             # 递归处理子目录
-            analyze_cgroup_memory(entry_path, prefix + "  ", max_width)
+            analyze_cgroup_memory(entry_path, prefix + "  ", max_width, cgroup_v2)
 
 if __name__ == "__main__":
     # 默认基路径
-    max_width =  calculate_max_width(cgroup_dir, "")
-    item = "name"
+    max_width =  calculate_max_width(cgroup_dir)
+    item = "group name"
     print(f"{item:{max_width}} | ", end = '')
-    for name in names:
+    for item in items:
+        name = item.get_showname()
         print(f" {name:10}", end = '')
     print('')
-    analyze_cgroup_memory(cgroup_dir, "", max_width)
+
+    if not is_cgroup_v2:
+        cgroup_dir = cgroup_dir + "memory/"
+
+    analyze_cgroup_memory(cgroup_dir, "", max_width, is_cgroup_v2)
 
