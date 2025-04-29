@@ -74,7 +74,7 @@ def build_memory_tree():
     Shmem = MemTreeNode("Shmem", lambda m: m["Shmem"])
     Shmem.add_child(MemTreeNode("ShmemHugePages", lambda m: m.get("ShmemHugePages", 0)))
 
-    Slab = MemTreeNode("Slub", lambda m: m["Slab"])
+    Slab = MemTreeNode("Slab", lambda m: m["Slab"])
     Slab.add_child(MemTreeNode("SReclaimable", lambda m: m["SReclaimable"]))
     Slab.add_child(MemTreeNode("SUnreclaim", lambda m: m["SUnreclaim"]))
 
