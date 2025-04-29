@@ -24,17 +24,19 @@ def read_schedstat_and_parse():
 # get all cpu ids
 cpu_ids = get_cpu_ids()
 
-# read cfs load for all CPU(s)
 cfs_loads = {}
 with open("/proc/sched_debug", "r") as file:
     current_cfs = None
     for line in file:
-        if (match := re.match(r"^cfs_rq\[(\d+)\]:/", line)):
+        match = re.match(r"^cfs_rq\[(\d+)\]:/", line)
+        if match:
             current_cfs = int(match.group(1))
             cfs_loads[current_cfs] = None
-        elif current_cfs is not None and (match := re.match(r"^\s+\.load\s+:\s+(\d+)", line)):
-            cfs_loads[current_cfs] = int(match.group(1))
-            current_cfs = None
+        elif current_cfs is not None:
+            match = re.match(r"^\s+\.load\s+:\s+(\d+)", line)
+            if match:
+                cfs_loads[current_cfs] = int(match.group(1))
+                current_cfs = None
 
 # ensure all cfs has load with default as 0 if /proc/sched_debug doesn't contain its entry
 for cpu in cpu_ids:
