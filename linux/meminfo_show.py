@@ -63,9 +63,7 @@ def build_memory_tree():
     root = MemTreeNode("MemTotal", lambda m: m["MemTotal"])
 
     free = MemTreeNode("MemFree", lambda m: m["MemFree"])
-    available = MemTreeNode("MemAvailable", lambda m: m["MemAvailable"])
     root.add_child(free)
-    root.add_child(available)
 
     cached = MemTreeNode("Cached", lambda m: m["Cached"])
     cached.add_child(MemTreeNode("Dirty", lambda m: m["Dirty"]))
