@@ -14,7 +14,7 @@ class Item:
 
 	def get_file_value(file):
 		with open(file, "r") as f:
-			return f.read().strip()
+                        return f.read().strip()
 
 	def get_field_in_file(file, field):
 		with open(file, "r") as f:
@@ -35,9 +35,9 @@ class Item:
 
 if not is_cgroup_v2:
 	items = [
-		Item('limit', 'limit_in_bytes'),
-		Item('usage', 'usage_in_bytes'),
-		Item('softlimit', 'soft_limit_in_bytes'),
+		Item('limit', 'memory.limit_in_bytes'),
+		Item('softlimit', 'memory.soft_limit_in_bytes'),
+		Item('usage', 'memory.usage_in_bytes'),
 		Item('cache', 'memory.stat', 'cache'),
 		Item('rss', 'memory.stat', 'rss')
 	]
@@ -53,24 +53,27 @@ else:
 	]
 
 def conver_num_to_readable(bytes):
-	if bytes == "max":
-		return "max"
+    if bytes == "max":
+        return "max"
 
-	if bytes == '':
-		return ''
+    if bytes == '':
+        return ''
 
-	bytes = int(bytes)
+    bytes = int(bytes)
 
-	if bytes >= 1024 * 1024 * 1024:
-		return f"{bytes/1024/1024/1024:.2f}G"
+    if bytes == 9223372036854771712:
+        return "max"
 
-	if bytes >= 1024 * 1024:
-		return f"{bytes/1024/1024:.2f}M"
+    if bytes >= 1024 * 1024 * 1024:
+        return f"{bytes/1024/1024/1024:.2f}G"
 
-	if bytes >= 1024:
-		return f"{bytes/1024:.2f}K"
+    if bytes >= 1024 * 1024:
+        return f"{bytes/1024/1024:.2f}M"
 
-	return f"{bytes}"
+    if bytes >= 1024:
+        return f"{bytes/1024:.2f}K"
+
+    return f"{bytes}"
 
 def calculate_max_width(base_path, prefix=""):
 	"""计算最长的 prefix + entry 的宽度"""
