@@ -11,7 +11,7 @@
 
 #define PAGE_SIZE (1 << 12)        // 4KB页
 #define MAX_MAPPINGS (512 * 32 * 16)           // 最大映射数
-#define ITERATIONS 10000
+#define ITERATIONS 1000000
 #define CACHE_LINE_SIZE 64         // 缓存行大小
 
 // 内存屏障，确保指令顺序
@@ -103,11 +103,11 @@ double test_tlb_access(int mapping_count, uint64_t tsc_freq) {
     uint64_t start = rdtsc();
     
     // 多次访问所有映射
-    for (int iter = 0; iter < ITERATIONS; iter++) {
-        for (int i = 0; i < mapping_count; i++) {
+    for (int iter = 0; iter < ITERATIONS;) {
+        for (int i = 0; i < mapping_count; i++, iter++) {
             mapping[i * PAGE_SIZE] += 1;
         }
-        mfence(); // 确保每次迭代的顺序
+        //mfence(); // 确保每次迭代的顺序
     }
     
     uint64_t end = rdtsc();
@@ -115,7 +115,7 @@ double test_tlb_access(int mapping_count, uint64_t tsc_freq) {
     free_continuous_mappings(mapping, mapping_count);
     
     // 转换为纳秒
-    double cycles_per_access = (double)(end - start) / (mapping_count * ITERATIONS);
+    double cycles_per_access = (double)(end - start) / (ITERATIONS);
     return cycles_per_access * 1000000000.0 / tsc_freq;
 }
 
@@ -132,7 +132,7 @@ int main() {
         double cycles_per_access = time_per_access * tsc_freq / 1000000000.0;
         printf("%d\t%.2f\t\t%.1f\n", mappings, time_per_access, cycles_per_access);
         
-        if (mappings * 1.5 <= MAX_MAPPINGS) {
+        if (mappings * 1.5 <= MAX_MAPPINGS * 0) {
             double mid_time = test_tlb_access(mappings * 1.5, tsc_freq);
             double mid_cycles = mid_time * tsc_freq / 1000000000.0;
             printf("%d\t%.2f\t\t%.1f\n", (int)(mappings * 1.5), mid_time, mid_cycles);
