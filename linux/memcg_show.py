@@ -44,19 +44,22 @@ class Htable:
         self.children.append(child)
 
     def print_csv(self, ident=0):
-        writer = csv.writer(sys.stdout)  # 直接输出到控制台
+        # 设置 quoting=csv.QUOTE_NONNUMERIC，非数字字段自动加引号（包括含空格的字段）
+        writer = csv.writer(sys.stdout, quoting=csv.QUOTE_NONNUMERIC)
 
-        # 准备当前行数据
-        row_data = [ident * " " + self.name]  # 节点名（带缩进）
+        # 准备数据：缩进 + 名称 + 动态列值
+        name = ident * ' ' + self.name
+        row_data = [name]  # 节点名（带缩进）
         for item in items:
-            row_data.append(self.dict_value.get(item.show_name, ""))
+            value = self.dict_value.get(item.show_name, "")
+            row_data.append(value)
 
-        # 写入 CSV 行（自动处理特殊字符）
+        # 写入 CSV 行（自动处理空格、逗号、引号）
         writer.writerow(row_data)
 
         # 递归处理子节点
         for child in self.children:
-            child.print_csv(ident + 2)
+            child.print_csv()
 
 if not is_cgroup_v2:
     items = [
@@ -70,6 +73,7 @@ else:
     items = [
     	Item('cpu.max', 'cpu.max'),
     	Item('cpu.weigh', 'cpu.weigh'),
+        Item('cpu.idle', 'cpu.idle'),
     	Item('cpuset.cpus', 'cpuset.cpus'),
     	Item('cpuset.mems', 'cpuset.meme'),
     	Item('memory.max', 'memory.max'),
@@ -120,7 +124,7 @@ def calculate_max_width(base_path, prefix=""):
     		max_width = max(max_width, calculate_max_width(entry_path, prefix + "  "))
     return max_width
 
-def build_cgroup_one(current_dir, gname):
+def build_cgroup_one(current_dir, gdir, gname):
     result = {}
     for item in items:
         try:
@@ -130,11 +134,14 @@ def build_cgroup_one(current_dir, gname):
             value = ""
 
         result[name] = value
-    return Htable(gname, result)
+    return Htable(gdir + '/' + gname, result)
 
-def build_cgroup_htable(parent_dir, gname, has_attribut = False):
+def build_cgroup_htable(parent_dir, gdir, gname, max_level = 6, has_attribut = False):
+    if max_level <= 0:
+        return None
+
     if has_attribut:
-        parent = build_cgroup_one(parent_dir, gname)
+        parent = build_cgroup_one(parent_dir, gdir, gname)
     else:
         result = {}
         for item in items:
@@ -149,10 +156,14 @@ def build_cgroup_htable(parent_dir, gname, has_attribut = False):
     	print(f"Path {base_path} not found.")
     	return
 
+    max_level -= 1;
+    if max_level <= 0:
+        return parent;
+
     for entry in entries:
     	entry_path = os.path.join(parent_dir, entry)
     	if os.path.isdir(entry_path):
-            child = build_cgroup_htable(entry_path, entry, True)
+            child = build_cgroup_htable(entry_path, gdir + '/' + entry, entry, max_level, True)
             parent.add_child(child)
 
     return parent
@@ -161,5 +172,5 @@ if __name__ == "__main__":
     if not is_cgroup_v2:
     	cgroup_dir = cgroup_dir + "memory/"
 
-    htable = build_cgroup_htable(cgroup_dir, "<root>")
+    htable = build_cgroup_htable(cgroup_dir, "", "<root>")
     htable.print_csv()
