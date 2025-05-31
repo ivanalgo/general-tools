@@ -1,0 +1,46 @@
+#!/usr/bin/python3
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+def generate_large_shuffle(spark):
+    """生成大规模数据集并通过 JOIN 触发 Shuffle"""
+    # 设置 Shuffle 分区数（默认200，增加以生成更多小文件）
+    spark.conf.set("spark.sql.shuffle.partitions", "500")
+
+    # 生成两个大数据集（每个 500 万行，含重复键）
+    num_records = 5_000_000
+    df1 = spark.range(1, num_records).withColumn("key", col("id") % 1000)  # 键范围 0-999
+    df2 = spark.range(1, num_records).withColumn("key", col("id") % 1000)  # 键范围 0-999
+
+    # 打印数据集信息
+    print("===== 数据集大小 =====")
+    print(f"df1 行数: {df1.count()}")
+    print(f"df2 行数: {df2.count()}")
+
+    # 触发 Shuffle JOIN（INNER JOIN，耗资源）
+    print("===== 开始 JOIN 操作（触发 Shuffle）=====")
+    joined_df = df1.join(df2, "key", "inner")
+
+    # 强制执行并计算结果（此处会触发磁盘 I/O）
+    result_count = joined_df.count()
+    print(f"JOIN 结果行数: {result_count}")
+
+    # 显示部分结果（可选）
+    joined_df.show(10)
+
+if __name__ == "__main__":
+    # 初始化 SparkSession
+    spark = SparkSession.builder \
+        .appName("ShuffleIOStressTest") \
+        .master("spark://10.37.98.175:7077") \
+        .config("spark.executor.memory", "2g") \
+        .config("spark.driver.memory", "2g")  \
+        .config("spark.local.dir", "/tmp/spark-shuffle") \
+        .getOrCreate()
+
+    try:
+        print("Finish connection to spark master")
+        generate_large_shuffle(spark)
+    finally:
+        spark.stop()

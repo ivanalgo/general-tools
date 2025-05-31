@@ -1,0 +1,5 @@
+#!/bin/bash
+
+source configs.sh
+
+${MEMTIER_DIR}/memtier_benchmark --protocol=redis --ratio=5:1 --rate=500 --clients=1 --print-percentiles=50,99,99.9 --test-time=60

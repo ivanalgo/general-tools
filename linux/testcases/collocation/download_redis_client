@@ -1,0 +1,11 @@
+#!/bin/bash
+
+source configs.sh
+
+wget -qO- https://github.com/RedisLabs/memtier_benchmark/archive/refs/tags/${MEMTIER_VERSION}.tar.gz | tar -xz -C ${INSTALL_DIR}
+
+cd ${MEMTIER_DIR}
+
+autoreconf -ivf
+./configure
+make

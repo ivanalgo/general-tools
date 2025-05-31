@@ -1,0 +1,21 @@
+#!/bin/bash
+
+source configs.sh
+
+if [ ! `id -u` -eq 0 ]; then
+	echo "Please use root or sudo" 1>&2
+	exit 1
+fi
+
+if [ ! -d ${INSTALL_DIR} ]; then
+	mkdir -p ${INSTALL_DIR}
+fi
+
+wget -qO- https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz | sudo tar -xz -C /opt
+
+REDIS_DIR=/opt/redis-${REDIS_VERSION}
+
+cd ${REDIS_DIR}
+make
+
+wget -qO- https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz | tar -xz -C /opt

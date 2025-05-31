@@ -1,0 +1,27 @@
+#!/bin/bash
+
+source configs.sh
+
+if [ ! `id -u` -eq 0 ]; then
+	echo "User root or sudo" 1>&2
+	exit 1
+fi
+
+if [ ! -z "`pidof redis-server`" ]; then
+	echo "Redis-server is in running, please kill them" 1>&2
+	exit 1
+fi
+
+if [ ! `ps -ef | grep spark-3.3.0-bin-hadoop3 | grep -v grep | wc -l` -eq 0 ]; then
+	echo "spark master or workers are running, please kill them" 1>&2
+	exit 1
+fi
+
+# Run as daemon
+${REDIS_DIR}/src/redis-server ./redis.conf
+
+#run spark master
+${SPARK_DIR}/sbin/start-master.sh
+
+#run spark workers
+${SPARK_DIR}/sbin/start-worker.sh -m 50G -c 4 spark://10.37.98.175:7077 --properties-file spark.conf
