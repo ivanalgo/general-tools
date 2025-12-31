@@ -204,11 +204,11 @@ unsigned int g_error = 50;
 static void parse_args(int argc, char *argv[])
 {
 	static const struct option long_options[] = {
-		{ "size",	  required_argument, 0, 's' },
+		{ "size",	   required_argument, 0, 's' },
 		{ "iteration", required_argument, 0, 'i' },
-	{ "verbose",   no_argument,	   0, 'v' },
-	{ "error",	 required_argument, 0, 'e' },
-		{ 0,		   0,				 0,  0  }
+		{ "verbose",   no_argument,	      0, 'v' },
+		{ "error",	   required_argument, 0, 'e' },
+		{ 0,		   0,				  0,  0  }
 	};
 
 	int opt;
@@ -218,8 +218,8 @@ static void parse_args(int argc, char *argv[])
 			long mb = atol(optarg);
 			if (mb < MIN_BUF_MB) {
 				fprintf(stderr,
-						"Invalid --size %ld MB, must be >= %d MB\n",
-						mb, MIN_BUF_MB);
+					"Invalid --size %ld MB, must be >= %d MB\n",
+					mb, MIN_BUF_MB);
 				exit(EXIT_FAILURE);
 			}
 			g_buf_size = (size_t)mb * 1024 * 1024;
@@ -229,7 +229,7 @@ static void parse_args(int argc, char *argv[])
 			long it = atol(optarg);
 			if (it <= 0) {
 				fprintf(stderr,
-						"Invalid --iteration %ld, must be > 0\n", it);
+					"Invalid --iteration %ld, must be > 0\n", it);
 				exit(EXIT_FAILURE);
 			}
 			g_iterations = (int)it;
@@ -251,8 +251,8 @@ static void parse_args(int argc, char *argv[])
 	}
 		default:
 			fprintf(stderr,
-					"Usage: %s [-s|--size <MB>] [-i|--iteration <count>]\n",
-					argv[0]);
+				"Usage: %s [-s|--size <MB>] [-i|--iteration <count>]\n",
+				argv[0]);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -264,8 +264,6 @@ static inline double now_sec(void)
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return ts.tv_sec*1e9 + ts.tv_nsec;
 }
-
-/* ---------- main ---------- */
 
 int main(int argc, char *argv[])
 {
@@ -282,10 +280,10 @@ int main(int argc, char *argv[])
 	/* 如果 group 已存在，直接报错 */
 	if (access(group_path, F_OK) == 0) {
 		fprintf(stderr,
-				"resctrl group %s already exists.\n"
-				"Please remove it manually:\n"
-				"  rmdir %s\n",
-				group_name, group_path);
+			"resctrl group %s already exists.\n"
+			"Please remove it manually:\n"
+			"  rmdir %s\n",
+			group_name, group_path);
 		return EXIT_FAILURE;
 	}
 
@@ -301,7 +299,7 @@ int main(int argc, char *argv[])
 	char tasks_path[512];
 	char pid_str[32];
 	snprintf(tasks_path, sizeof(tasks_path),
-			 "%s/tasks", group_path);
+		"%s/tasks", group_path);
 	snprintf(pid_str, sizeof(pid_str), "%d", pid);
 	write_file(tasks_path, pid_str);
 
@@ -321,6 +319,7 @@ int main(int argc, char *argv[])
 
 	double prev_time = now_sec();
 	uint64_t expected_bytes = 0;
+
 	for (int iter = 0; 
 	g_iterations < 0 || iter < g_iterations;
 	iter++) {
@@ -371,4 +370,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
