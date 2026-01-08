@@ -346,15 +346,23 @@ int main(int argc, char *argv[])
 		int error = (delta_total * 1000 / expected_bytes) - 1000;
 
 		if (g_verbose) {
-			double time_sec = (now_time - prev_time) / 1e9;
-			double bw_mb = (double)delta_total / 1024 / 1024;
-			double bw_rate = bw_mb / time_sec;
-			printf("local : %lu bytes\n", delta_local);
-			printf("total : %lu bytes\n", delta_total);
-			printf("expect: %lu bytes\n", expected_bytes);
+			printf("MBM statistiic\n");
+			printf("Sum:\n");
+			printf("       local : %lu bytes\n", delta_local);
+			printf("       total : %lu bytes\n", delta_total);
+			printf("Speed :\n"
+			       "       local %.2f MB/s\n"
+			       "       total %.2f MB/s\n",
+				       delta_local * 1e9 / ((now_time - prev_time) * 1024 * 1024),
+			               delta_total * 1e9 / ((now_time - prev_time) * 1024 * 1024));
+
+			printf("Program:\n");
+			printf("         %lu bytes\n", expected_bytes);
+			printf("         %.2f MB/s\n",
+					expected_bytes * 1e9 / ((now_time - prev_time) * 1024 * 1024));
+			printf("Error:\n");
 			printf("ratio(resctrl / expected) : %.3f\n",
-				(double)delta_total / expected_bytes);
-			printf("bw_rate(mb/s): %.2f\n", bw_rate);
+		                        (double)delta_total / expected_bytes);
 			printf("error: %d‰\n\n", error);
 		}
 
