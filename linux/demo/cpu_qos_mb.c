@@ -21,6 +21,7 @@
 
 static char group_name[64];
 static char group_path[256];
+static char group_schemata[256];
 
 static void die(const char *msg)
 {
@@ -60,7 +61,7 @@ static uint64_t read_group_mbm_metric(const char *group, const char *item)
 {
 	char mon_path[128];
 	snprintf(mon_path, sizeof(mon_path),
-			 RESCTRL_PATH "/mon_groups/%s/mon_data", group);
+			 RESCTRL_PATH "/%s/mon_data", group);
 
 	DIR *dir = opendir(mon_path);
 	if (!dir)
@@ -110,6 +111,10 @@ static void cleanup_group(void)
 #define MBM_CFG_PATH "/sys/fs/resctrl/info/L3_MON/mbm_total_bytes_config"
 #define MAX_CFG_LEN 4096
 
+#define CCD_ID_MAX 1024
+static int ccd_list[CCD_ID_MAX];
+static int ccd_list_cnt = 0;
+
 void check_mbm_total_bytes_config(void)
 {
 	FILE *fp;
@@ -145,6 +150,7 @@ void check_mbm_total_bytes_config(void)
 			continue;
 		}
 
+		ccd_list[ccd_list_cnt++] = id;
 		if (val != 0x3f) {
 			printf("  CCD %d: 0x%x (EXPECTED 0x3f)\n", id, val);
 			bad = 1;
@@ -166,7 +172,7 @@ void check_mbm_total_bytes_config(void)
 		printf("<failed to re-read config>\"\n");
 		if (fp)
 			fclose(fp);
-		exit(1);
+		return;
 	}
 
 	if (fp)
@@ -186,7 +192,7 @@ void check_mbm_total_bytes_config(void)
 	}
 
 	printf("\" > %s\n", MBM_CFG_PATH);
-	exit(1);
+	return;
 }
 
 static void signal_handler(int sig)
@@ -200,6 +206,7 @@ size_t g_buf_size = MIN_BUF_MB * 1024 * 1024;	 /* bytes */
 int	g_iterations = -1; /* -1 表示无限循环 */
 bool   g_verbose = false;
 unsigned int g_error = 50;
+int g_bw = -1;
 
 static void parse_args(int argc, char *argv[])
 {
@@ -208,11 +215,12 @@ static void parse_args(int argc, char *argv[])
 		{ "iteration", required_argument, 0, 'i' },
 		{ "verbose",   no_argument,	      0, 'v' },
 		{ "error",	   required_argument, 0, 'e' },
+		{ "bw",        required_argument, 0, 'b' },
 		{ 0,		   0,				  0,  0  }
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "s:i:v", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "s:i:vb:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 's': {
 			long mb = atol(optarg);
@@ -235,23 +243,34 @@ static void parse_args(int argc, char *argv[])
 			g_iterations = (int)it;
 			break;
 		}
-	case 'v': {
-		g_verbose = true;
-		break;
-	}
-	case 'e': {
-		unsigned int e = atoi(optarg);
-		if (e <= 0 || e > 500) {
-			fprintf(stderr,
-				"Invalid --error %d, must be >0 and < 500\n", e);
-			exit(EXIT_FAILURE);
+		case 'v': {
+			g_verbose = true;
+			break;
 		}
-		g_error = e;
-		break;
-	}
+		case 'e': {
+			unsigned int e = atoi(optarg);
+			if (e <= 0 || e > 500) {
+				fprintf(stderr,
+					"Invalid --error %d, must be >0 and < 500\n", e);
+				exit(EXIT_FAILURE);
+			}
+			g_error = e;
+			break;
+		}
+		case 'b': {
+			g_bw = atoi(optarg);
+			printf("g_bw = %d\n", g_bw);
+			break;
+		}
 		default:
 			fprintf(stderr,
-				"Usage: %s [-s|--size <MB>] [-i|--iteration <count>]\n",
+				"Usage: %s [ options ]\n"
+				"\n"
+				"-i --iteration run iteration before stop\n"
+				"-s --size      memory size for each iteration to deal with\n"
+				"-v --verbose   show verbose inforation\n"
+				"-e --error     specify the tolerable errror\n"
+				"-b --bw        specify the bw for memory bandwidth allocation group\n", 
 				argv[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -275,7 +294,9 @@ int main(int argc, char *argv[])
 	/* group 名字：pid_xxx */
 	snprintf(group_name, sizeof(group_name), "pid_%d", pid);
 	snprintf(group_path, sizeof(group_path),
-			 RESCTRL_PATH "/mon_groups/%s", group_name);
+			 RESCTRL_PATH "/%s", group_name);
+	snprintf(group_schemata, sizeof(group_schemata),
+			RESCTRL_PATH "/pid_%d/schemata", pid); 
 
 	/* 如果 group 已存在，直接报错 */
 	if (access(group_path, F_OK) == 0) {
@@ -294,6 +315,15 @@ int main(int argc, char *argv[])
 	/* 创建 group */
 	if (mkdir(group_path, 0755) < 0)
 		die("mkdir mon_group");
+
+	/* set mbm control */
+	if (g_bw > 0) {
+		char buf[256];
+		for (int i = 0; i < ccd_list_cnt; i++) {
+			snprintf(buf, sizeof(buf),	"MB:%d=%d\n", ccd_list[i], g_bw);
+			write_file(group_schemata, buf);
+		}
+	}
 
 	/* 把自己加入 group */
 	char tasks_path[512];
