@@ -17,7 +17,7 @@
 
 #define RESCTRL_PATH "/sys/fs/resctrl"
 #define STRIDE	   64
-#define MIN_BUF_MB   512
+#define MIN_BUF_MB 128
 
 static char group_name[64];
 static char group_path[256];
@@ -203,7 +203,7 @@ static void signal_handler(int sig)
 }
 
 size_t g_buf_size = MIN_BUF_MB * 1024 * 1024;	 /* bytes */
-int	g_iterations = -1; /* -1 表示无限循环 */
+int	g_duration = 1;
 bool   g_verbose = false;
 unsigned int g_error = 50;
 int g_bw = -1;
@@ -212,7 +212,7 @@ static void parse_args(int argc, char *argv[])
 {
 	static const struct option long_options[] = {
 		{ "size",	   required_argument, 0, 's' },
-		{ "iteration", required_argument, 0, 'i' },
+		{ "duration",  required_argument, 0, 'd' },
 		{ "verbose",   no_argument,	      0, 'v' },
 		{ "error",	   required_argument, 0, 'e' },
 		{ "bw",        required_argument, 0, 'b' },
@@ -220,7 +220,7 @@ static void parse_args(int argc, char *argv[])
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "s:i:vb:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "s:d:ve:b:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 's': {
 			long mb = atol(optarg);
@@ -233,14 +233,14 @@ static void parse_args(int argc, char *argv[])
 			g_buf_size = (size_t)mb * 1024 * 1024;
 			break;
 		}
-		case 'i': {
-			long it = atol(optarg);
-			if (it <= 0) {
+		case 'd': {
+			long d = atol(optarg);
+			if (d <= 0) {
 				fprintf(stderr,
-					"Invalid --iteration %ld, must be > 0\n", it);
+					"Invalid --iteration %ld, must be > 0\n", d);
 				exit(EXIT_FAILURE);
 			}
-			g_iterations = (int)it;
+			g_duration = (int)d;
 			break;
 		}
 		case 'v': {
@@ -266,7 +266,7 @@ static void parse_args(int argc, char *argv[])
 			fprintf(stderr,
 				"Usage: %s [ options ]\n"
 				"\n"
-				"-i --iteration run iteration before stop\n"
+				"-d --duration  duration between two outputs\n"
 				"-s --size      memory size for each iteration to deal with\n"
 				"-v --verbose   show verbose inforation\n"
 				"-e --error     specify the tolerable errror\n"
@@ -350,10 +350,7 @@ int main(int argc, char *argv[])
 	double prev_time = now_sec();
 	uint64_t expected_bytes = 0;
 
-	for (int iter = 0; 
-	g_iterations < 0 || iter < g_iterations;
-	iter++) {
-
+	while (1) {
 		for (size_t i = 0; i < g_buf_size; i += STRIDE)
 			buf[i]++;
 
@@ -361,7 +358,7 @@ int main(int argc, char *argv[])
 		usleep(1);
 
 		double now_time = now_sec();
-		if (now_time - prev_time < 5e9)
+		if (now_time - prev_time < 1e9 * g_duration)
 			continue;
 
 		uint64_t cur_local =
