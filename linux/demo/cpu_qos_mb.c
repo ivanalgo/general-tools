@@ -112,8 +112,63 @@ static void cleanup_group(void)
 #define MAX_CFG_LEN 4096
 
 #define CCD_ID_MAX 1024
-static int ccd_list[CCD_ID_MAX];
-static int ccd_list_cnt = 0;
+static int l3catch_id_list[CCD_ID_MAX];
+static int l3catch_id_cnt = 0;
+
+void parse_mbm_l3_ids(const char *schemata_path)
+{
+    FILE *fp;
+    char line[512];
+
+    fp = fopen(schemata_path, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to open %s: %s\n",
+                schemata_path, strerror(errno));
+        return;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+
+        char *p = line;
+
+        /* 跳过行首空白（space / tab） */
+        while (*p == ' ' || *p == '\t')
+            p++;
+
+        /* 只处理 MB: 行 */
+        if (strncmp(p, "MB:", 3) != 0)
+            continue;
+
+        /* 指向 "MB:" 之后 */
+        p += 3;
+
+        /* 去掉行尾换行 */
+        char *nl = strchr(p, '\n');
+        if (nl)
+            *nl = '\0';
+
+        /* 解析: <id>=<value>;<id>=<value> */
+        char *saveptr;
+        char *token = strtok_r(p, ";", &saveptr);
+
+        while (token) {
+            int l3_id;
+            int value;
+
+            if (sscanf(token, "%d=%d", &l3_id, &value) == 2) {
+                l3catch_id_list[l3catch_id_cnt++] = l3_id;
+                printf("Debug: l3_id = %d\n", l3_id);
+            }
+
+            token = strtok_r(NULL, ";", &saveptr);
+        }
+
+        /* MB 只有一行，解析完即可退出 */
+        break;
+    }
+
+    fclose(fp);
+}
 
 void check_mbm_total_bytes_config(void)
 {
@@ -150,7 +205,6 @@ void check_mbm_total_bytes_config(void)
 			continue;
 		}
 
-		ccd_list[ccd_list_cnt++] = id;
 		if (val != 0x3f) {
 			printf("  CCD %d: 0x%x (EXPECTED 0x3f)\n", id, val);
 			bad = 1;
@@ -316,11 +370,13 @@ int main(int argc, char *argv[])
 	if (mkdir(group_path, 0755) < 0)
 		die("mkdir mon_group");
 
+	parse_mbm_l3_ids(group_schemata);
+
 	/* set mbm control */
 	if (g_bw > 0) {
 		char buf[256];
-		for (int i = 0; i < ccd_list_cnt; i++) {
-			snprintf(buf, sizeof(buf),	"MB:%d=%d\n", ccd_list[i], g_bw);
+		for (int i = 0; i < l3catch_id_cnt; i++) {
+			snprintf(buf, sizeof(buf),	"MB:%d=%d\n", l3catch_id_list[i], g_bw);
 			write_file(group_schemata, buf);
 		}
 	}
