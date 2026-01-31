@@ -23,6 +23,7 @@ def parse_zoneinfo():
                     "min": 0,
                     "low": 0,
                     "high": 0,
+                    "promo": 0,
                     "free": 0,
                     "managed": 0,
                 }
@@ -42,6 +43,9 @@ def parse_zoneinfo():
             elif line.startswith("managed"):
                 managed_value = int(line.split()[1])
                 set_value(water_mark[(node_id, zone_name)], 'managed', managed_value)
+            elif line.startswith("promo"):
+                promo_value = int(line.split()[1])
+                set_value(water_mark[(node_id, zone_name)], "promo", promo_value)
 
     return water_mark
 
@@ -65,16 +69,17 @@ if __name__ == "__main__":
 
     water_mark = parse_zoneinfo()
 
-    print("{:<6} {:<10} {:>16} {:>16} {:>16} {:>16} {:>16}".format(
-        "Node", "Zone", f"min({unit.upper()})", f"low({unit.upper()})", f"high({unit.upper()})", f"free({unit.upper()})", f"managed({unit.upper()})"
+    print("{:<6} {:<10} {:>16} {:>16} {:>16} {:>16} {:>16} {:>16}".format(
+        "Node", "Zone", f"min({unit.upper()})", f"low({unit.upper()})", f"high({unit.upper()})", f"promo({unit.upper()})", f"free({unit.upper()})", f"managed({unit.upper()})"
     ))
     print("-" * 100)
     for (node_id, zone_name), values in water_mark.items():
-        print("{:<6} {:<10} {:>16} {:>16} {:>16} {:>16} {:>16}".format(
+        print("{:<6} {:<10} {:>16} {:>16} {:>16} {:>16} {:>16} {:>16}".format(
             node_id, zone_name,
             format_value(values["min"], unit),
             format_value(values["low"], unit),
             format_value(values["high"], unit),
+            format_value(values["promo"], unit),
             format_value(values["free"], unit),
             format_value(values["managed"], unit)
         ))
