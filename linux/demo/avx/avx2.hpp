@@ -1,6 +1,7 @@
 template <typename T>
 struct AVX2 {
     using INPUT_TYPE = T;
+	using OUTPUT_TYPE = T;
 	static constexpr const char *CLASS_NAME = "avx2";
 	static constexpr const int INPUT_ARGS = 2;
     static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
@@ -124,16 +125,16 @@ struct AVX2 {
     {
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
             return std::array{
-                OpEntry<T>{ "avx2 add", avx_add, sisd_add },
-                OpEntry<T>{ "avx2 sub", avx_sub, sisd_sub },
-                OpEntry<T>{ "avx2 mul", avx_mul, sisd_mul },
-                OpEntry<T>{ "avx2 div", avx_div, sisd_div },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 add", avx_add, sisd_add },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 sub", avx_sub, sisd_sub },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 mul", avx_mul, sisd_mul },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 div", avx_div, sisd_div },
             };
         } else {
             return std::array{
-                OpEntry<T>{ "avx2 add", avx_add, sisd_add },
-                OpEntry<T>{ "avx2 sub", avx_sub, sisd_sub },
-                OpEntry<T>{ "avx2 mul", avx_mul, sisd_mul },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 add", avx_add, sisd_add },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 sub", avx_sub, sisd_sub },
+                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx2 mul", avx_mul, sisd_mul },
             };
         }
     }
@@ -142,6 +143,7 @@ struct AVX2 {
 template<typename T>
 struct AVX2_FMA {
     using INPUT_TYPE = T;
+	using OUTPUT_TYPE = T;
     static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
     static constexpr const char* CLASS_NAME = "AVX2_FMA";
     static constexpr int INPUT_ARGS = 3;
@@ -283,10 +285,114 @@ struct AVX2_FMA {
     static constexpr auto make_ops()
     {
         return std::array{
-            OpEntry3<T>{ "fmadd",  avx_fmadd,  sisd_fmadd  },
-            OpEntry3<T>{ "fmsub",  avx_fmsub,  sisd_fmsub  },
-            OpEntry3<T>{ "fnmadd", avx_fnmadd, sisd_fnmadd },
-            OpEntry3<T>{ "fnmsub", avx_fnmsub, sisd_fnmsub },
+            OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fmadd",  avx_fmadd,  sisd_fmadd  },
+            OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fmsub",  avx_fmsub,  sisd_fmsub  },
+            OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fnmadd", avx_fnmadd, sisd_fnmadd },
+            OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fnmsub", avx_fnmsub, sisd_fnmsub },
+        };
+    }
+};
+
+template <typename T>
+struct AVX2_CMP_BOOL_TYPE;
+
+template<>
+struct AVX2_CMP_BOOL_TYPE<float> {
+	using type = int32_t;
+};
+
+template<>
+struct AVX2_CMP_BOOL_TYPE<int> {
+	using type = int32_t;
+};
+
+template<>
+struct AVX2_CMP_BOOL_TYPE<double> {
+	using type = int64_t;
+};
+
+template<typename T>
+struct AVX2_CMP {
+    using INPUT_TYPE  = T;
+    using OUTPUT_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
+
+    static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
+    static constexpr const char* CLASS_NAME = "AVX2_CMP";
+    static constexpr int INPUT_ARGS = 2;
+
+    /* ================= AVX ================= */
+
+    static void avx_gt(const T* a, const T* b, OUTPUT_TYPE* out)
+    {
+        if constexpr (std::is_same_v<T, float>) {
+            __m256 va = _mm256_loadu_ps(a);
+            __m256 vb = _mm256_loadu_ps(b);
+            __m256 vc = _mm256_cmp_ps(va, vb, _CMP_GT_OQ);
+            _mm256_storeu_si256((__m256i*)out,
+                                _mm256_castps_si256(vc));
+        } else if constexpr (std::is_same_v<T, double>) {
+            __m256d va = _mm256_loadu_pd(a);
+            __m256d vb = _mm256_loadu_pd(b);
+            __m256d vc = _mm256_cmp_pd(va, vb, _CMP_GT_OQ);
+            _mm256_storeu_si256((__m256i*)out,
+                                _mm256_castpd_si256(vc));
+        } else if constexpr (std::is_same_v<T, int>) {
+            __m256i va = _mm256_loadu_si256((const __m256i*)a);
+            __m256i vb = _mm256_loadu_si256((const __m256i*)b);
+            __m256i vc = _mm256_cmpgt_epi32(va, vb);
+            _mm256_storeu_si256((__m256i*)out, vc);
+        } else {
+            static_assert(std::is_same_v<T, void>,
+                          "AVX2_CMP: unsupported type");
+        }
+    }
+
+    static void avx_eq(const T* a, const T* b, OUTPUT_TYPE* out)
+    {
+        if constexpr (std::is_same_v<T, float>) {
+            __m256 va = _mm256_loadu_ps(a);
+            __m256 vb = _mm256_loadu_ps(b);
+            __m256 vc = _mm256_cmp_ps(va, vb, _CMP_EQ_OQ);
+            _mm256_storeu_si256((__m256i*)out,
+                                _mm256_castps_si256(vc));
+        } else if constexpr (std::is_same_v<T, double>) {
+            __m256d va = _mm256_loadu_pd(a);
+            __m256d vb = _mm256_loadu_pd(b);
+            __m256d vc = _mm256_cmp_pd(va, vb, _CMP_EQ_OQ);
+            _mm256_storeu_si256((__m256i*)out,
+                                _mm256_castpd_si256(vc));
+        } else if constexpr (std::is_same_v<T, int>) {
+            __m256i va = _mm256_loadu_si256((const __m256i*)a);
+            __m256i vb = _mm256_loadu_si256((const __m256i*)b);
+            __m256i vc = _mm256_cmpeq_epi32(va, vb);
+            _mm256_storeu_si256((__m256i*)out, vc);
+        } else {
+            static_assert(std::is_same_v<T, void>,
+                          "AVX2_CMP: unsupported type");
+        }
+    }
+
+    /* ================= SISD ================= */
+
+    static void sisd_gt(const T* a, const T* b, OUTPUT_TYPE* out)
+    {
+        for (int i = 0; i < INPUT_SIZE; ++i)
+            out[i] = (a[i] > b[i]) ? -1 : 0;
+    }
+
+    static void sisd_eq(const T* a, const T* b, OUTPUT_TYPE* out)
+    {
+        for (int i = 0; i < INPUT_SIZE; ++i)
+            out[i] = (a[i] == b[i]) ? -1 : 0;
+    }
+
+    /* ================= OPS ================= */
+
+    static constexpr auto make_ops()
+    {
+        return std::array{
+            OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "cmp_gt", avx_gt, sisd_gt },
+            OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "cmp_eq", avx_eq, sisd_eq },
         };
     }
 };

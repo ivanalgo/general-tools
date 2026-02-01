@@ -7,19 +7,19 @@
 #include <array>
 #include <chrono>
 
-template <typename T>
+template <typename IN_TYPE, typename OUT_TYPE>
 struct OpEntry {
     const char* name;
 
-    void (*avx)(const T*, const T*, T*);
-    void (*sisd)(const T*, const T*, T*);
+    void (*avx)(const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
+    void (*sisd)(const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
 };
 
-template <typename T>
+template <typename IN_TYPE, typename OUT_TYPE>
 struct OpEntry3 {
 	const char* name;
-	void (*avx)(const T*, const T*, const T*, T*);
-	void (*sisd)(const T*, const T*, const T*, T*);
+	void (*avx)(const IN_TYPE*, const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
+	void (*sisd)(const IN_TYPE*, const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
 };
 
 #include "avx1.hpp"
@@ -89,8 +89,8 @@ void RandomTest()
 		if constexpr (Class::INPUT_ARGS == 2) {
 			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
 			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE avx_c[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE sisd_c[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_c[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_c[Class::INPUT_SIZE];
 
 			RandomInit(a);
 			RandomInit(b);
@@ -101,15 +101,16 @@ void RandomTest()
 			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
 			Debug("a = ", a);
 			Debug("b = ", b);
-			Debug("c = ", avx_c);
+			Debug("avx_c = ", avx_c);
+			Debug("sisd_c = ", sisd_c);
 
 			assert(CmpResult(avx_c, sisd_c));
 		} else if constexpr (Class::INPUT_ARGS == 3) {
 			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
 			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
 			typename Class::INPUT_TYPE c[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE avx_d[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE sisd_d[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_d[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_d[Class::INPUT_SIZE];
 
 			RandomInit(a);
 			RandomInit(b);
@@ -122,7 +123,8 @@ void RandomTest()
 			Debug("a = ", a);
 			Debug("b = ", b);
 			Debug("c = ", c);
-			Debug("d = ", avx_d);
+			Debug("avx_d = ", avx_d);
+			Debug("sisd_d = ", sisd_d);
 
 			assert(CmpResult(avx_d, sisd_d));
 
@@ -139,4 +141,7 @@ int main()
 	RandomTest<AVX2<float>>();
 	RandomTest<AVX2_FMA<float>>();
 	RandomTest<AVX2_FMA<double>>();
+	RandomTest<AVX2_CMP<int>>();
+	RandomTest<AVX2_CMP<float>>();
+	RandomTest<AVX2_CMP<double>>();
 }
