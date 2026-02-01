@@ -1,0 +1,109 @@
+#include <immintrin.h>
+#include <type_traits>
+#include <stdint.h>
+#include <random>
+#include <assert.h>
+#include <iostream>
+#include <array>
+#include <chrono>
+
+template <typename T>
+struct OpEntry {
+    const char* name;
+
+    void (*avx)(const T*, const T*, T*);
+    void (*sisd)(const T*, const T*, T*);
+};
+
+#include "avx1.hpp"
+#include "avx2.hpp"
+
+template <typename T, size_t N>
+void RandomInit(T (&a)[N])
+{
+    // 用时间和 random_device 混合，避免退化
+    auto seed = static_cast<uint32_t>(
+        std::chrono::high_resolution_clock::now()
+            .time_since_epoch()
+            .count()
+    ) ^ std::random_device{}();
+
+    std::mt19937 rng(seed);
+
+    if constexpr (std::is_floating_point_v<T>) {
+        std::uniform_real_distribution<T> dist(
+            static_cast<T>(-1.0),
+            static_cast<T>(1.0)
+        );
+        for (size_t i = 0; i < N; ++i) {
+            a[i] = dist(rng);
+        }
+    } else if constexpr (std::is_integral_v<T>) {
+        std::uniform_int_distribution<T> dist(
+            static_cast<T>(-100),
+            static_cast<T>(100)
+        );
+        for (size_t i = 0; i < N; ++i) {
+            a[i] = dist(rng);
+        }
+    } else {
+        static_assert(std::is_same_v<T, void>,
+                      "RandomInit: unsupported type");
+    }
+}
+
+template <typename T, size_t N>
+bool CmpResult(T (&a)[N], T (&b)[N])
+{
+	for (size_t i = 0; i < N; ++i) {
+		if (a[i] != b[i])
+			return false;
+	}
+
+	return true;
+}
+
+template <typename T, size_t N>
+void Debug(const char *token, T (&a)[N])
+{
+	std::cout << token;
+	for (size_t i = 0; i < N; ++i) {
+		std::cout << a[i] << " ";
+	}
+
+	std::cout << "\n";
+}
+
+template <typename Class>
+void RandomTest()
+{
+	constexpr auto ops = Class::make_ops();
+	for (const auto& op : ops) {
+		typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
+		typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
+		typename Class::INPUT_TYPE avx_c[Class::INPUT_SIZE];
+		typename Class::INPUT_TYPE sisd_c[Class::INPUT_SIZE];
+
+		RandomInit(a);
+		RandomInit(b);
+
+		op.avx(a, b, avx_c);
+		op.sisd(a, b, sisd_c);
+
+		std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+		Debug("a = ", a);
+		Debug("b = ", b);
+		Debug("c = ", avx_c);
+
+		assert(CmpResult(avx_c, sisd_c));
+	}
+}
+
+int main()
+{
+	RandomTest<AVX<int>>();
+	RandomTest<AVX<float>>();
+	RandomTest<AVX<double>>();
+	RandomTest<AVX2<int>>();
+	RandomTest<AVX2<float>>();
+}
