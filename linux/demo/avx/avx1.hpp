@@ -2,6 +2,7 @@ template <typename T>
 struct AVX {
     using INPUT_TYPE = T;
 	static constexpr const char *CLASS_NAME = "avx";
+	static constexpr const int INPUT_ARGS = 2;
 
     static constexpr int BIT_WIDTH =
         std::is_integral_v<T> ? 128 : 256;

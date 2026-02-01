@@ -15,6 +15,13 @@ struct OpEntry {
     void (*sisd)(const T*, const T*, T*);
 };
 
+template <typename T>
+struct OpEntry3 {
+	const char* name;
+	void (*avx)(const T*, const T*, const T*, T*);
+	void (*sisd)(const T*, const T*, const T*, T*);
+};
+
 #include "avx1.hpp"
 #include "avx2.hpp"
 
@@ -79,23 +86,47 @@ void RandomTest()
 {
 	constexpr auto ops = Class::make_ops();
 	for (const auto& op : ops) {
-		typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
-		typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
-		typename Class::INPUT_TYPE avx_c[Class::INPUT_SIZE];
-		typename Class::INPUT_TYPE sisd_c[Class::INPUT_SIZE];
+		if constexpr (Class::INPUT_ARGS == 2) {
+			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE avx_c[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE sisd_c[Class::INPUT_SIZE];
 
-		RandomInit(a);
-		RandomInit(b);
+			RandomInit(a);
+			RandomInit(b);
 
-		op.avx(a, b, avx_c);
-		op.sisd(a, b, sisd_c);
+			op.avx(a, b, avx_c);
+			op.sisd(a, b, sisd_c);
 
-		std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
-		Debug("a = ", a);
-		Debug("b = ", b);
-		Debug("c = ", avx_c);
+			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+			Debug("a = ", a);
+			Debug("b = ", b);
+			Debug("c = ", avx_c);
 
-		assert(CmpResult(avx_c, sisd_c));
+			assert(CmpResult(avx_c, sisd_c));
+		} else if constexpr (Class::INPUT_ARGS == 3) {
+			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE c[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE avx_d[Class::INPUT_SIZE];
+			typename Class::INPUT_TYPE sisd_d[Class::INPUT_SIZE];
+
+			RandomInit(a);
+			RandomInit(b);
+			RandomInit(c);
+
+			op.avx(a, b, c, avx_d);
+			op.sisd(a, b, c, sisd_d);
+
+			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+			Debug("a = ", a);
+			Debug("b = ", b);
+			Debug("c = ", c);
+			Debug("d = ", avx_d);
+
+			assert(CmpResult(avx_d, sisd_d));
+
+		}
 	}
 }
 
@@ -106,4 +137,6 @@ int main()
 	RandomTest<AVX<double>>();
 	RandomTest<AVX2<int>>();
 	RandomTest<AVX2<float>>();
+	RandomTest<AVX2_FMA<float>>();
+	RandomTest<AVX2_FMA<double>>();
 }
