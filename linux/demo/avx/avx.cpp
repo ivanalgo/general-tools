@@ -144,4 +144,6 @@ int main()
 	RandomTest<AVX2_CMP<int>>();
 	RandomTest<AVX2_CMP<float>>();
 	RandomTest<AVX2_CMP<double>>();
+	//RandomTest<AVX2_BITWISE<int>>();
+	RandomTest<AVX2_BITWISE<float>>();
 }
