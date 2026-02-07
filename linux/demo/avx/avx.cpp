@@ -24,6 +24,7 @@ struct OpEntry3 {
 
 #include "avx1.hpp"
 #include "avx2.hpp"
+#include "avx2_shift.hpp"
 
 template <typename T, size_t N>
 void RandomInit(T (&a)[N])
@@ -147,4 +148,5 @@ int main()
 	RandomTest<AVX2_BITWISE<int>>();
 	RandomTest<AVX2_BITWISE<float>>();
 	RandomTest<AVX2_BITWISE<double>>();
+	RandomTest<AVX2_SHIFT<int>>();
 }
