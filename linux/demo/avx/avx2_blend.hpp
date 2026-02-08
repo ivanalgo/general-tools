@@ -1,7 +1,9 @@
 template<typename T>
 struct AVX2_BLEND {
-	using INPUT_TYPE  = T;
-	using MASK_TYPE   = typename AVX2_CMP_BOOL_TYPE<T>::type;
+	using ARG1_TYPE = T;
+	using ARG2_TYPE = T;
+	using ARG3_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
+	using MASK_TYPE = ARG3_TYPE;
 	using OUTPUT_TYPE = T;
 
 	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
@@ -71,7 +73,7 @@ struct AVX2_BLEND {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry3<INPUT_TYPE, INPUT_TYPE, MASK_TYPE, OUTPUT_TYPE>{
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
 				"blend", avx_blend, sisd_blend
 			},
 		};

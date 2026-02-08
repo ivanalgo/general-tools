@@ -145,7 +145,9 @@ struct AVX2 {
 
 template<typename T>
 struct AVX2_FMA {
-	using INPUT_TYPE = T;
+	using ARG1_TYPE = T;
+	using ARG2_TYPE = T;
+	using ARG3_TYPE = T;
 	using OUTPUT_TYPE = T;
 	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
 	static constexpr const char* CLASS_NAME = "AVX2_FMA";
@@ -288,10 +290,10 @@ struct AVX2_FMA {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fmadd",  avx_fmadd,  sisd_fmadd  },
-			OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fmsub",  avx_fmsub,  sisd_fmsub  },
-			OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fnmadd", avx_fnmadd, sisd_fnmadd },
-			OpEntry3<INPUT_TYPE, OUTPUT_TYPE>{ "fnmsub", avx_fnmsub, sisd_fnmsub },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmadd",  avx_fmadd,  sisd_fmadd  },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmsub",  avx_fmsub,  sisd_fmsub  },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmadd", avx_fnmadd, sisd_fnmadd },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmsub", avx_fnmsub, sisd_fnmsub },
 		};
 	}
 };

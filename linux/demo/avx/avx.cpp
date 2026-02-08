@@ -15,16 +15,17 @@ struct OpEntry {
     void (*sisd)(const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
 };
 
-template <typename IN_TYPE, typename OUT_TYPE>
+template <typename ARG1_TYPE, typename ARG2_TYPE, typename ARG3_TYPE, typename OUT_TYPE>
 struct OpEntry3 {
 	const char* name;
-	void (*avx)(const IN_TYPE*, const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
-	void (*sisd)(const IN_TYPE*, const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
+	void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
+	void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
 };
 
 #include "avx1.hpp"
 #include "avx2.hpp"
 #include "avx2_shift.hpp"
+#include "avx2_blend.hpp"
 
 template <typename T, size_t N>
 void RandomInit(T (&a)[N])
@@ -107,9 +108,9 @@ void RandomTest()
 
 			assert(CmpResult(avx_c, sisd_c));
 		} else if constexpr (Class::INPUT_ARGS == 3) {
-			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE c[Class::INPUT_SIZE];
+			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
+			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
+			typename Class::ARG3_TYPE c[Class::INPUT_SIZE];
 			typename Class::OUTPUT_TYPE avx_d[Class::INPUT_SIZE];
 			typename Class::OUTPUT_TYPE sisd_d[Class::INPUT_SIZE];
 
@@ -149,4 +150,7 @@ int main()
 	RandomTest<AVX2_BITWISE<float>>();
 	RandomTest<AVX2_BITWISE<double>>();
 	RandomTest<AVX2_SHIFT<int>>();
+	RandomTest<AVX2_BLEND<int>>();
+	RandomTest<AVX2_BLEND<float>>();
+	RandomTest<AVX2_BLEND<double>>();
 }
