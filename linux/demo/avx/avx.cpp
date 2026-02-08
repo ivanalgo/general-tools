@@ -27,6 +27,12 @@ struct OpEntry3 {
 #include "avx2_shift.hpp"
 #include "avx2_blend.hpp"
 
+template <typename Class, typename = void>
+struct has_arg3_init : std::false_type {};
+
+template <typename Class>
+struct has_arg3_init<Class, std::void_t<decltype(Class::arg3_init(std::declval<typename Class::ARG3_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
+
 template <typename T, size_t N>
 void RandomInit(T (&a)[N])
 {
@@ -116,7 +122,11 @@ void RandomTest()
 
 			RandomInit(a);
 			RandomInit(b);
-			RandomInit(c);
+			if constexpr (has_arg3_init<Class>::value) {
+				Class::arg3_init(c);
+			} else {
+				RandomInit(c);
+			}
 
 			op.avx(a, b, c, avx_d);
 			op.sisd(a, b, c, sisd_d);

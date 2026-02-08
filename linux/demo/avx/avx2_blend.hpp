@@ -10,6 +10,22 @@ struct AVX2_BLEND {
 	static constexpr const char* CLASS_NAME = "AVX2_BLEND";
 	static constexpr int INPUT_ARGS = 3;
 
+	static void arg3_init(MASK_TYPE (&a)[INPUT_SIZE]) {
+		// 用时间和 random_device 混合，避免退化
+		auto seed = static_cast<uint32_t>(
+			std::chrono::high_resolution_clock::now()
+				.time_since_epoch()
+				.count()
+		) ^ std::random_device{}();
+
+		std::mt19937 rng(seed);
+		std::uniform_int_distribution<int> dist(0, 1);
+
+		for (int i = 0; i < INPUT_SIZE; ++i) {
+			a[i] = dist(rng) ? -1 : 0;
+		}
+	}
+
 	static void avx_blend(const T* a,
 						  const T* b,
 						  const MASK_TYPE* mask,
