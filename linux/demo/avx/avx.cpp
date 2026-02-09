@@ -24,8 +24,12 @@ struct OpEntry3 {
 
 #include "avx1.hpp"
 #include "avx2.hpp"
+#include "avx2_fma.hpp"
+#include "avx2_cmp.hpp"
+#include "avx2_bitwise.hpp"
 #include "avx2_shift.hpp"
 #include "avx2_blend.hpp"
+#include "avx2_minmax.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -163,4 +167,7 @@ int main()
 	RandomTest<AVX2_BLEND<int>>();
 	RandomTest<AVX2_BLEND<float>>();
 	RandomTest<AVX2_BLEND<double>>();
+	RandomTest<AVX2_MINMAX<int>>();
+	RandomTest<AVX2_MINMAX<float>>();
+	RandomTest<AVX2_MINMAX<double>>();
 }
