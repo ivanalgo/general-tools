@@ -7,12 +7,12 @@
 #include <array>
 #include <chrono>
 
-template <typename IN_TYPE, typename OUT_TYPE>
+template <typename ARG1_TYPE, typename ARG2_TYPE, typename OUT_TYPE>
 struct OpEntry {
     const char* name;
 
-    void (*avx)(const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
-    void (*sisd)(const IN_TYPE*, const IN_TYPE*, OUT_TYPE*);
+    void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
+    void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
 };
 
 template <typename ARG1_TYPE, typename ARG2_TYPE, typename ARG3_TYPE, typename OUT_TYPE>
@@ -95,8 +95,8 @@ void RandomTest()
 	constexpr auto ops = Class::make_ops();
 	for (const auto& op : ops) {
 		if constexpr (Class::INPUT_ARGS == 2) {
-			typename Class::INPUT_TYPE a[Class::INPUT_SIZE];
-			typename Class::INPUT_TYPE b[Class::INPUT_SIZE];
+			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
+			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
 			typename Class::OUTPUT_TYPE avx_c[Class::INPUT_SIZE];
 			typename Class::OUTPUT_TYPE sisd_c[Class::INPUT_SIZE];
 

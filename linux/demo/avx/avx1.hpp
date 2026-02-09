@@ -1,6 +1,7 @@
 template <typename T>
 struct AVX {
-    using INPUT_TYPE = T;
+    using ARG1_TYPE = T;
+    using ARG2_TYPE = T;
 	using OUTPUT_TYPE = T;
 	static constexpr const char *CLASS_NAME = "avx";
 	static constexpr const int INPUT_ARGS = 2;
@@ -136,16 +137,16 @@ struct AVX {
     {
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T,double>) {
             return std::array{
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx add", avx_add, sisd_add },
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx sub", avx_sub, sisd_sub },
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx mul", avx_mul, sisd_mul },
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "avx div", avx_div, sisd_div },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx add", avx_add, sisd_add },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx sub", avx_sub, sisd_sub },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx mul", avx_mul, sisd_mul },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx div", avx_div, sisd_div },
             };
         } else if constexpr (std::is_integral_v<T>) {
             return std::array{
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "sse add", avx_add, sisd_add },
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "sse sub", avx_sub, sisd_sub },
-                OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "sse mul", avx_mul, sisd_mul },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse add", avx_add, sisd_add },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse sub", avx_sub, sisd_sub },
+                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse mul", avx_mul, sisd_mul },
             };
         }
     }

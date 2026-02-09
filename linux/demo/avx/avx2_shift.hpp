@@ -7,7 +7,8 @@ template<typename T>
 struct AVX2_SHIFT {
 	static_assert(std::is_same_v<T, int32_t>);
 
-	using INPUT_TYPE  = T;
+	using ARG1_TYPE  = T;
+	using ARG2_TYPE  = T;
 	using OUTPUT_TYPE = T;
 
 	static constexpr int INPUT_SIZE = 8;
@@ -82,9 +83,9 @@ struct AVX2_SHIFT {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "sll", avx_sll, sisd_sll },
-			OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "srl", avx_srl, sisd_srl },
-			OpEntry<INPUT_TYPE, OUTPUT_TYPE>{ "sra", avx_sra, sisd_sra },
+			OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", avx_sll, sisd_sll },
+			OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", avx_srl, sisd_srl },
+			OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", avx_sra, sisd_sra },
 		};
 	}
 };
