@@ -97,8 +97,8 @@ struct AVX2_CMP {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "cmp_gt", avx_gt, sisd_gt },
-			OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "cmp_eq", avx_eq, sisd_eq },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "cmp_gt", avx_gt, sisd_gt },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "cmp_eq", avx_eq, sisd_eq },
 		};
 	}
 };

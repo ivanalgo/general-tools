@@ -137,16 +137,16 @@ struct AVX {
     {
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T,double>) {
             return std::array{
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx add", avx_add, sisd_add },
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx sub", avx_sub, sisd_sub },
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx mul", avx_mul, sisd_mul },
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx div", avx_div, sisd_div },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx mul", avx_mul, sisd_mul },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx div", avx_div, sisd_div },
             };
         } else if constexpr (std::is_integral_v<T>) {
             return std::array{
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse add", avx_add, sisd_add },
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse sub", avx_sub, sisd_sub },
-                OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse mul", avx_mul, sisd_mul },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sse mul", avx_mul, sisd_mul },
             };
         }
     }

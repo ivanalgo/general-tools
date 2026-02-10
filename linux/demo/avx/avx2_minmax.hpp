@@ -100,10 +100,10 @@ struct AVX2_MINMAX {
     static constexpr auto make_ops()
     {
         return std::array{
-            OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
                 "max", avx_max, sisd_max
             },
-            OpEntry<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
                 "min", avx_min, sisd_min
             },
         };

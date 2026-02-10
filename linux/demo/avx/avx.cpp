@@ -7,8 +7,16 @@
 #include <array>
 #include <chrono>
 
+template <typename ARG1_TYPE, typename OUT_TYPE>
+struct OpEntry1 {
+    const char* name;
+
+    void (*avx)(const ARG1_TYPE*, OUT_TYPE*);
+    void (*sisd)(const ARG1_TYPE*, OUT_TYPE*);
+};
+
 template <typename ARG1_TYPE, typename ARG2_TYPE, typename OUT_TYPE>
-struct OpEntry {
+struct OpEntry2 {
     const char* name;
 
     void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
@@ -30,6 +38,7 @@ struct OpEntry3 {
 #include "avx2_shift.hpp"
 #include "avx2_blend.hpp"
 #include "avx2_minmax.hpp"
+#include "avx2_permut.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -98,7 +107,23 @@ void RandomTest()
 {
 	constexpr auto ops = Class::make_ops();
 	for (const auto& op : ops) {
-		if constexpr (Class::INPUT_ARGS == 2) {
+		if constexpr (Class::INPUT_ARGS == 1) {
+			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_b[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_b[Class::INPUT_SIZE];
+
+			RandomInit(a);
+
+			op.avx(a, avx_b);
+			op.sisd(a, sisd_b);
+
+			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+			Debug("a = ", a);
+			Debug("avx_b = ", avx_b);
+			Debug("sisd_b = ", sisd_b);
+
+			assert(CmpResult(avx_b, sisd_b));
+		} else if constexpr (Class::INPUT_ARGS == 2) {
 			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
 			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
 			typename Class::OUTPUT_TYPE avx_c[Class::INPUT_SIZE];
@@ -170,4 +195,9 @@ int main()
 	RandomTest<AVX2_MINMAX<int>>();
 	RandomTest<AVX2_MINMAX<float>>();
 	RandomTest<AVX2_MINMAX<double>>();
+	RandomTest<AVX2_PERMUTE::SHUFFLE_0123<int>>();
+	RandomTest<AVX2_PERMUTE::UNPACKLO<int>>();
+	RandomTest<AVX2_PERMUTE::UNPACKHI<int>>();
+	RandomTest<AVX2_PERMUTE::SWAP_LANES<int>>();
+	RandomTest<AVX2_PERMUTE::PERMUTEVAR<int>>();
 }
