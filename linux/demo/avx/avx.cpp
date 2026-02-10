@@ -39,6 +39,7 @@ struct OpEntry3 {
 #include "avx2_blend.hpp"
 #include "avx2_minmax.hpp"
 #include "avx2_permut.hpp"
+#include "avx512.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -200,4 +201,7 @@ int main()
 	RandomTest<AVX2_PERMUTE::UNPACKHI<int>>();
 	RandomTest<AVX2_PERMUTE::SWAP_LANES<int>>();
 	RandomTest<AVX2_PERMUTE::PERMUTEVAR<int>>();
+	RandomTest<AVX512<int>>();
+	RandomTest<AVX512<float>>();
+	RandomTest<AVX512<double>>();
 }
