@@ -23,6 +23,7 @@ struct AVX2_CMP {
 	using OUTPUT_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
 
 	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 	static constexpr const char* CLASS_NAME = "AVX2_CMP";
 	static constexpr int INPUT_ARGS = 2;
 

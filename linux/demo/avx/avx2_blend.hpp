@@ -7,6 +7,7 @@ struct AVX2_BLEND {
 	using OUTPUT_TYPE = T;
 
 	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 	static constexpr const char* CLASS_NAME = "AVX2_BLEND";
 	static constexpr int INPUT_ARGS = 3;
 

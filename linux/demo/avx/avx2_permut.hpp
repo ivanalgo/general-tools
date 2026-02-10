@@ -15,6 +15,7 @@ namespace AVX2_PERMUTE
 
         static constexpr int INPUT_SIZE = 8;
         static constexpr int INPUT_ARGS = 1;
+		static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
         static constexpr const char* CLASS_NAME = "AVX2_SHUFFLE_0123";
 
         /* ---------- AVX ---------- */
@@ -62,6 +63,7 @@ namespace AVX2_PERMUTE
         using OUTPUT_TYPE = int;
 
         static constexpr int INPUT_SIZE = 8;
+		static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
         static constexpr int INPUT_ARGS = 2;
         static constexpr const char* CLASS_NAME = "AVX2_UNPACKLO";
 
@@ -108,6 +110,7 @@ namespace AVX2_PERMUTE
         using OUTPUT_TYPE = int;
 
         static constexpr int INPUT_SIZE = 8;
+		static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
         static constexpr int INPUT_ARGS = 2;
         static constexpr const char* CLASS_NAME = "AVX2_UNPACKHI";
 
@@ -153,6 +156,7 @@ namespace AVX2_PERMUTE
         using OUTPUT_TYPE = int;
 
         static constexpr int INPUT_SIZE = 8;
+		static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
         static constexpr int INPUT_ARGS = 1;
         static constexpr const char* CLASS_NAME = "AVX2_SWAP_LANES";
 
@@ -195,6 +199,7 @@ namespace AVX2_PERMUTE
         using OUTPUT_TYPE = int;
 
         static constexpr int INPUT_SIZE = 8;
+		static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
         static constexpr int INPUT_ARGS = 2;
         static constexpr const char* CLASS_NAME = "AVX2_PERMUTEVAR";
 

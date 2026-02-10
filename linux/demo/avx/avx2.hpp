@@ -9,6 +9,7 @@ struct AVX2 {
 	static constexpr const char *CLASS_NAME = "avx2";
 	static constexpr const int INPUT_ARGS = 2;
 	static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	static void sisd_add(const T *a, const T *b, T *c) {
 		for (size_t i = 0; i < INPUT_SIZE; i++) {

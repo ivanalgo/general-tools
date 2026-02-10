@@ -5,6 +5,7 @@ struct AVX2_FMA {
 	using ARG3_TYPE = T;
 	using OUTPUT_TYPE = T;
 	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 	static constexpr const char* CLASS_NAME = "AVX2_FMA";
 	static constexpr int INPUT_ARGS = 3;
 

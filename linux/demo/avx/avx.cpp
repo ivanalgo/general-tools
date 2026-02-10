@@ -40,6 +40,7 @@ struct OpEntry3 {
 #include "avx2_minmax.hpp"
 #include "avx2_permut.hpp"
 #include "avx512.hpp"
+#include "avx512_cmp.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -97,7 +98,8 @@ void Debug(const char *token, T (&a)[N])
 {
 	std::cout << token;
 	for (size_t i = 0; i < N; ++i) {
-		std::cout << a[i] << " ";
+		// use +a[i] to make a[i] become int type if it is int8_t
+		std::cout << +a[i] << " ";
 	}
 
 	std::cout << "\n";
@@ -110,8 +112,8 @@ void RandomTest()
 	for (const auto& op : ops) {
 		if constexpr (Class::INPUT_ARGS == 1) {
 			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_b[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_b[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_b[Class::OUTPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_b[Class::OUTPUT_SIZE];
 
 			RandomInit(a);
 
@@ -127,8 +129,8 @@ void RandomTest()
 		} else if constexpr (Class::INPUT_ARGS == 2) {
 			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
 			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_c[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_c[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_c[Class::OUTPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_c[Class::OUTPUT_SIZE];
 
 			RandomInit(a);
 			RandomInit(b);
@@ -147,8 +149,8 @@ void RandomTest()
 			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
 			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
 			typename Class::ARG3_TYPE c[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_d[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_d[Class::INPUT_SIZE];
+			typename Class::OUTPUT_TYPE avx_d[Class::OUTPUT_SIZE];
+			typename Class::OUTPUT_TYPE sisd_d[Class::OUTPUT_SIZE];
 
 			RandomInit(a);
 			RandomInit(b);
@@ -204,4 +206,7 @@ int main()
 	RandomTest<AVX512<int>>();
 	RandomTest<AVX512<float>>();
 	RandomTest<AVX512<double>>();
+	RandomTest<AVX512_CMP<int>>();
+	RandomTest<AVX512_CMP<float>>();
+	RandomTest<AVX512_CMP<double>>();
 }

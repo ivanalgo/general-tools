@@ -12,6 +12,7 @@ struct AVX2_SHIFT {
 	using OUTPUT_TYPE = T;
 
 	static constexpr int INPUT_SIZE = 8;
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 	static constexpr const char* CLASS_NAME = "AVX2_SHIFT";
 	static constexpr int INPUT_ARGS = 2;
 

@@ -7,6 +7,7 @@ struct AVX512 {
     static constexpr const char* CLASS_NAME = "avx512";
     static constexpr int INPUT_ARGS = 2;
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= SISD ================= */
 

@@ -11,6 +11,7 @@ struct AVX {
 
     static constexpr int INPUT_SIZE =
         BIT_WIDTH / (8 * sizeof(T));
+	static constexpr int OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= add ================= */
     static void avx_add(const T* a, const T* b, T* c)
