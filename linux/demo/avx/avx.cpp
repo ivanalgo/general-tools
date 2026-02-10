@@ -41,12 +41,22 @@ struct OpEntry3 {
 #include "avx2_permut.hpp"
 #include "avx512.hpp"
 #include "avx512_cmp.hpp"
+#include "avx512_bitwise.hpp"
+#include "avx512_shift.hpp"
+#include "avx512_blend.hpp"
+#include "avx512_permute.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
 
 template <typename Class>
 struct has_arg3_init<Class, std::void_t<decltype(Class::arg3_init(std::declval<typename Class::ARG3_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
+
+template <typename Class, typename = void>
+struct has_arg2_init : std::false_type {};
+
+template <typename Class>
+struct has_arg2_init<Class, std::void_t<decltype(Class::arg2_init(std::declval<typename Class::ARG2_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
 
 template <typename T, size_t N>
 void RandomInit(T (&a)[N])
@@ -133,7 +143,11 @@ void RandomTest()
 			typename Class::OUTPUT_TYPE sisd_c[Class::OUTPUT_SIZE];
 
 			RandomInit(a);
-			RandomInit(b);
+			if constexpr (has_arg2_init<Class>::value) {
+				Class::arg2_init(b);
+			} else {
+				RandomInit(b);
+			}
 
 			op.avx(a, b, avx_c);
 			op.sisd(a, b, sisd_c);
@@ -153,7 +167,13 @@ void RandomTest()
 			typename Class::OUTPUT_TYPE sisd_d[Class::OUTPUT_SIZE];
 
 			RandomInit(a);
-			RandomInit(b);
+
+			if constexpr (has_arg2_init<Class>::value) {
+				Class::arg2_init(b);
+			} else {
+				RandomInit(b);
+			}
+
 			if constexpr (has_arg3_init<Class>::value) {
 				Class::arg3_init(c);
 			} else {
@@ -209,4 +229,17 @@ int main()
 	RandomTest<AVX512_CMP<int>>();
 	RandomTest<AVX512_CMP<float>>();
 	RandomTest<AVX512_CMP<double>>();
+    RandomTest<AVX512_BITWISE<int>>();
+    RandomTest<AVX512_BITWISE<float>>();
+    RandomTest<AVX512_BITWISE<double>>();
+    RandomTest<AVX512_SHIFT<int>>();
+    RandomTest<AVX512_BLEND<int>>();
+    RandomTest<AVX512_BLEND<float>>();
+    RandomTest<AVX512_BLEND<double>>();
+    RandomTest<AVX512_PERMUTE<int>>();
+    RandomTest<AVX512_PERMUTE<float>>();
+    RandomTest<AVX512_PERMUTE<double>>();
+    RandomTest<AVX512_CMP<int>>();
+    RandomTest<AVX512_CMP<float>>();
+    RandomTest<AVX512_CMP<double>>();
 }
