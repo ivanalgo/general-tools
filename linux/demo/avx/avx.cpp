@@ -45,6 +45,7 @@ struct OpEntry3 {
 #include "avx512_shift.hpp"
 #include "avx512_blend.hpp"
 #include "avx512_permute.hpp"
+#include "avx512_reduce.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -242,4 +243,7 @@ int main()
     RandomTest<AVX512_CMP<int>>();
     RandomTest<AVX512_CMP<float>>();
     RandomTest<AVX512_CMP<double>>();
+	RandomTest<AVX512_REDUCE<int>>();
+	RandomTest<AVX512_REDUCE<float>>();
+	RandomTest<AVX512_REDUCE<double>>();
 }
