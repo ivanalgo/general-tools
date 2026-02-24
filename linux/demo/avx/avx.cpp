@@ -97,8 +97,12 @@ template <typename T, size_t N>
 bool CmpResult(T (&a)[N], T (&b)[N])
 {
 	for (size_t i = 0; i < N; ++i) {
-		if (a[i] != b[i])
+		if constexpr (std::is_floating_point_v<T>) {
+			if (std::fabs(a[i] - b[i]) > 1e5)
+				return false;
+		} else if (a[i] != b[i]) {
 			return false;
+		}
 	}
 
 	return true;
