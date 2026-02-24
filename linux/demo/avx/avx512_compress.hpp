@@ -40,7 +40,7 @@ struct AVX512_COMPRESS {
 	{
 		MASK_TYPE mask = mask_ptr[0];
 
-		for (int i = 0; i < LANES; ++i)
+		for (size_t i = 0; i < LANES; ++i)
 			out[i] = T(0);
 
 		if constexpr (std::is_same_v<T, float>) {

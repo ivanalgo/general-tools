@@ -48,6 +48,7 @@ struct OpEntry3 {
 #include "avx512_reduce.hpp"
 #include "avx512_mask.hpp"
 #include "avx512_compress.hpp"
+#include "avx512_convert.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -258,4 +259,10 @@ int main()
 	RandomTest<AVX512_COMPRESS<int>>();
 	RandomTest<AVX512_COMPRESS<float>>();
 	RandomTest<AVX512_COMPRESS<double>>();
+#if 0
+	RandomTest<AVX512_CONVERT<int, float>>();
+	RandomTest<AVX512_CONVERT<int, double>>();
+	RandomTest<AVX512_CONVERT<float, int>>();
+	RandomTest<AVX512_CONVERT<double, int>>();
+#endif
 }
