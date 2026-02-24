@@ -50,6 +50,7 @@ struct OpEntry3 {
 #include "avx512_compress.hpp"
 #include "avx512_convert.hpp"
 #include "avx512_fma.hpp"
+#include "avx512_vnni.hpp"
 
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
@@ -269,4 +270,13 @@ int main()
 
 	RandomTest<AVX512_FMA<float>>();
 	RandomTest<AVX512_FMA<double>>();
+
+	// INT8 for vnni in reference
+	RandomTest<AVX512_VNNI<uint8_t, int8_t>>();
+	RandomTest<AVX512_VNNI<uint8_t, int8_t, true>>();
+	// INT16 for vnni in reference
+	RandomTest<AVX512_VNNI<int16_t, int16_t>>();
+	RandomTest<AVX512_VNNI<int16_t, int16_t, true>>();
+
+
 }
