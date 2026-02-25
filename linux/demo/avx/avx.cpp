@@ -6,6 +6,8 @@
 #include <iostream>
 #include <array>
 #include <chrono>
+#include <tuple>
+#include <utility>
 
 template <typename ARG1_TYPE, typename OUT_TYPE>
 struct OpEntry1 {
@@ -125,84 +127,74 @@ void Debug(const char *token, T (&a)[N])
 	std::cout << "\n";
 }
 
+template <typename Class, size_t I> struct ArgType;
+template <typename Class> struct ArgType<Class, 0> { using type = typename Class::ARG1_TYPE; };
+template <typename Class> struct ArgType<Class, 1> { using type = typename Class::ARG2_TYPE; };
+template <typename Class> struct ArgType<Class, 2> { using type = typename Class::ARG3_TYPE; };
+
+template <typename T, size_t N>
+auto& AsCArray(std::array<T, N>& arr) {
+    return *reinterpret_cast<T(*)[N]>(arr.data());
+}
+
+template <typename Class, size_t I, typename T, size_t N>
+void InitArg(std::array<T, N>& arr) {
+    auto& c_arr = AsCArray(arr);
+    if constexpr (I == 0) {
+        RandomInit(c_arr);
+    } else if constexpr (I == 1) {
+        if constexpr (has_arg2_init<Class>::value) {
+            Class::arg2_init(c_arr);
+        } else {
+            RandomInit(c_arr);
+        }
+    } else if constexpr (I == 2) {
+        if constexpr (has_arg3_init<Class>::value) {
+            Class::arg3_init(c_arr);
+        } else {
+            RandomInit(c_arr);
+        }
+    }
+}
+
+template <typename Class, typename Op, size_t... Is>
+void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
+    std::tuple<std::array<typename ArgType<Class, Is>::type, Class::INPUT_SIZE>...> inputs;
+
+    (InitArg<Class, Is>(std::get<Is>(inputs)), ...);
+
+    typename Class::OUTPUT_TYPE avx_out[Class::OUTPUT_SIZE];
+    typename Class::OUTPUT_TYPE sisd_out[Class::OUTPUT_SIZE];
+
+    std::apply([&](auto&... args) {
+        op.avx(args.data()..., avx_out);
+        op.sisd(args.data()..., sisd_out);
+    }, inputs);
+
+    std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+    
+    const char* arg_names[] = {"a = ", "b = ", "c = "};
+    std::apply([&](auto&... args) {
+        size_t idx = 0;
+        ((Debug(arg_names[idx++], AsCArray(args))), ...);
+    }, inputs);
+
+    char out_name[] = "avx_? = ";
+    out_name[4] = 'a' + sizeof...(Is) + 1; // 'b', 'c', 'd'
+    Debug(out_name, avx_out);
+    
+    out_name[0] = 's'; out_name[1] = 'i'; out_name[2] = 's'; out_name[3] = 'd';
+    Debug(out_name, sisd_out);
+
+    assert(CmpResult(avx_out, sisd_out));
+}
+
 template <typename Class>
 void RandomTest()
 {
 	constexpr auto ops = Class::make_ops();
 	for (const auto& op : ops) {
-		if constexpr (Class::INPUT_ARGS == 1) {
-			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_b[Class::OUTPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_b[Class::OUTPUT_SIZE];
-
-			RandomInit(a);
-
-			op.avx(a, avx_b);
-			op.sisd(a, sisd_b);
-
-			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
-			Debug("a = ", a);
-			Debug("avx_b = ", avx_b);
-			Debug("sisd_b = ", sisd_b);
-
-			assert(CmpResult(avx_b, sisd_b));
-		} else if constexpr (Class::INPUT_ARGS == 2) {
-			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
-			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_c[Class::OUTPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_c[Class::OUTPUT_SIZE];
-
-			RandomInit(a);
-			if constexpr (has_arg2_init<Class>::value) {
-				Class::arg2_init(b);
-			} else {
-				RandomInit(b);
-			}
-
-			op.avx(a, b, avx_c);
-			op.sisd(a, b, sisd_c);
-
-			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
-			Debug("a = ", a);
-			Debug("b = ", b);
-			Debug("avx_c = ", avx_c);
-			Debug("sisd_c = ", sisd_c);
-
-			assert(CmpResult(avx_c, sisd_c));
-		} else if constexpr (Class::INPUT_ARGS == 3) {
-			typename Class::ARG1_TYPE a[Class::INPUT_SIZE];
-			typename Class::ARG2_TYPE b[Class::INPUT_SIZE];
-			typename Class::ARG3_TYPE c[Class::INPUT_SIZE];
-			typename Class::OUTPUT_TYPE avx_d[Class::OUTPUT_SIZE];
-			typename Class::OUTPUT_TYPE sisd_d[Class::OUTPUT_SIZE];
-
-			RandomInit(a);
-
-			if constexpr (has_arg2_init<Class>::value) {
-				Class::arg2_init(b);
-			} else {
-				RandomInit(b);
-			}
-
-			if constexpr (has_arg3_init<Class>::value) {
-				Class::arg3_init(c);
-			} else {
-				RandomInit(c);
-			}
-
-			op.avx(a, b, c, avx_d);
-			op.sisd(a, b, c, sisd_d);
-
-			std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
-			Debug("a = ", a);
-			Debug("b = ", b);
-			Debug("c = ", c);
-			Debug("avx_d = ", avx_d);
-			Debug("sisd_d = ", sisd_d);
-
-			assert(CmpResult(avx_d, sisd_d));
-
-		}
+		RunTestImpl<Class>(op, std::make_index_sequence<Class::INPUT_ARGS>{});
 	}
 }
 
