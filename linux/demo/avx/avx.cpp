@@ -66,6 +66,17 @@ struct has_arg2_init : std::false_type {};
 template <typename Class>
 struct has_arg2_init<Class, std::void_t<decltype(Class::arg2_init(std::declval<typename Class::ARG2_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
 
+template <typename Class, size_t I>
+constexpr size_t GetArgSize() {
+    if constexpr (I == 0) {
+        return Class::ARG1_SIZE;
+    } else if constexpr (I == 1) {
+        return Class::ARG2_SIZE;
+    } else if constexpr (I == 2) {
+        return Class::ARG3_SIZE;
+    }
+}
+
 template <typename T, size_t N>
 void RandomInit(T (&a)[N])
 {
@@ -159,7 +170,7 @@ void InitArg(std::array<T, N>& arr) {
 
 template <typename Class, typename Op, size_t... Is>
 void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
-    std::tuple<std::array<typename ArgType<Class, Is>::type, Class::INPUT_SIZE>...> inputs;
+    std::tuple<std::array<typename ArgType<Class, Is>::type, GetArgSize<Class, Is>()>...> inputs;
 
     (InitArg<Class, Is>(std::get<Is>(inputs)), ...);
 

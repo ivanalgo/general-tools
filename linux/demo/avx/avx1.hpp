@@ -1,17 +1,21 @@
 template <typename T>
 struct AVX {
-    using ARG1_TYPE = T;
-    using ARG2_TYPE = T;
-	using OUTPUT_TYPE = T;
-	static constexpr const char *CLASS_NAME = "avx";
-	static constexpr const int INPUT_ARGS = 2;
+    static constexpr const char *CLASS_NAME = "avx";
 
-    static constexpr int BIT_WIDTH =
+    static constexpr size_t BIT_WIDTH =
         std::is_integral_v<T> ? 128 : 256;
 
-    static constexpr int INPUT_SIZE =
+    static constexpr size_t INPUT_SIZE =
         BIT_WIDTH / (8 * sizeof(T));
-	static constexpr int OUTPUT_SIZE = INPUT_SIZE;
+
+    static constexpr const int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= add ================= */
     static void avx_add(const T* a, const T* b, T* c)
@@ -41,7 +45,7 @@ struct AVX {
 
     static void sisd_add(const T* a, const T* b, T* c)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i)
+        for (size_t i = 0; i < INPUT_SIZE; ++i)
             c[i] = a[i] + b[i];
     }
 
@@ -73,7 +77,7 @@ struct AVX {
 
     static void sisd_sub(const T* a, const T* b, T* c)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i)
+        for (size_t i = 0; i < INPUT_SIZE; ++i)
             c[i] = a[i] - b[i];
     }
 
@@ -104,7 +108,7 @@ struct AVX {
 
     static void sisd_mul(const T* a, const T* b, T* c)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i)
+        for (size_t i = 0; i < INPUT_SIZE; ++i)
             c[i] = a[i] * b[i];
     }
 
@@ -129,7 +133,7 @@ struct AVX {
 
     static void sisd_div(const T* a, const T* b, T* c)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i)
+        for (size_t i = 0; i < INPUT_SIZE; ++i)
             c[i] = a[i] / b[i];
     }
 

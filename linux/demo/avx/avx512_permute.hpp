@@ -1,12 +1,18 @@
 template <typename T>
 struct AVX512_PERMUTE {
-    using ARG1_TYPE = T;
-    using ARG2_TYPE = std::conditional_t<std::is_same_v<T, double>, int64_t, int>;
-    using OUTPUT_TYPE = T;
-    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
-    static constexpr size_t OUTPUT_SIZE = 512 / (8 * sizeof(T));
     static constexpr const char* CLASS_NAME = "AVX512_PERMUTE";
-    static constexpr int INPUT_ARGS = 2; // a + idx
+
+    static constexpr size_t LANES = 512 / (8 * sizeof(T));
+    static constexpr size_t INPUT_SIZE = LANES;
+
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = std::conditional_t<std::is_same_v<T, double>, int64_t, int>;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = LANES;
 
 	static void arg2_init(ARG2_TYPE (&idx)[INPUT_SIZE]) {
 

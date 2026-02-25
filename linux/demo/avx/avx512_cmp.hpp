@@ -1,22 +1,31 @@
 template <typename T>
-struct AVX512_CMP
-{
-    using ARG1_TYPE   = T;
-    using ARG2_TYPE   = T;
-
-    // Store raw mask bits
-    using OUTPUT_TYPE = std::conditional_t<
-        std::is_same_v<T, double>,
-        uint8_t,        // __mmask8
-        uint16_t        // __mmask16 (float / int32)
-    >;
-
+struct AVX512_CMP {
     static constexpr const char* CLASS_NAME = "AVX512_CMP";
-    static constexpr int  INPUT_ARGS  = 2;
-    static constexpr size_t OUTPUT_SIZE = 1;
 
-    static constexpr size_t INPUT_SIZE =
-        std::is_same_v<T, double> ? 8 : 16;
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    // ---- OUTPUT ----
+    // AVX-512 cmp 输出为 mask 寄存器
+    // 这里使用标准整型来表达 bit mask：
+    //
+    // 64 lanes  -> uint64_t  (对应 __mmask64)
+    // 32 lanes  -> uint32_t  (对应 __mmask32)
+    // 16 lanes  -> uint16_t  (对应 __mmask16)
+    // 8 lanes   -> uint8_t   (对应 __mmask8)
+
+    using OUTPUT_TYPE =
+        std::conditional_t<INPUT_SIZE == 64, uint64_t,   // __mmask64
+        std::conditional_t<INPUT_SIZE == 32, uint32_t,   // __mmask32
+        std::conditional_t<INPUT_SIZE == 16, uint16_t,   // __mmask16
+        std::conditional_t<INPUT_SIZE == 8,  uint8_t,    // __mmask8
+        void>>>>;
+    static constexpr size_t OUTPUT_SIZE = 1;
 
     /* ========================= AVX ========================= */
 

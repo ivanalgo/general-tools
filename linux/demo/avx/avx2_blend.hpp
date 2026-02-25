@@ -1,15 +1,21 @@
-template<typename T>
+template <typename T>
 struct AVX2_BLEND {
-	using ARG1_TYPE = T;
-	using ARG2_TYPE = T;
-	using ARG3_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
-	using MASK_TYPE = ARG3_TYPE;
-	using OUTPUT_TYPE = T;
+    static constexpr const char* CLASS_NAME = "AVX2_BLEND";
 
-	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-	static constexpr const char* CLASS_NAME = "AVX2_BLEND";
-	static constexpr int INPUT_ARGS = 3;
+    static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+    using ARG3_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
+    static constexpr size_t ARG3_SIZE = INPUT_SIZE;
+
+    using MASK_TYPE = ARG3_TYPE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	static void arg3_init(MASK_TYPE (&a)[INPUT_SIZE]) {
 		// 用时间和 random_device 混合，避免退化
@@ -22,7 +28,7 @@ struct AVX2_BLEND {
 		std::mt19937 rng(seed);
 		std::uniform_int_distribution<int> dist(0, 1);
 
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			a[i] = dist(rng) ? -1 : 0;
 		}
 	}
@@ -83,7 +89,7 @@ struct AVX2_BLEND {
 						   const MASK_TYPE* mask,
 						   T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
+		for (size_t i = 0; i < INPUT_SIZE; ++i)
 			out[i] = mask[i] ? b[i] : a[i];
 	}
 

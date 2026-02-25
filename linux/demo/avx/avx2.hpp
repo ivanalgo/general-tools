@@ -3,13 +3,19 @@
 
 template <typename T>
 struct AVX2 {
-	using ARG1_TYPE = T;
-	using ARG2_TYPE = T;
-	using OUTPUT_TYPE = T;
-	static constexpr const char *CLASS_NAME = "avx2";
-	static constexpr const int INPUT_ARGS = 2;
-	static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
+    static constexpr const char *CLASS_NAME = "avx2";
+
+    static constexpr size_t INPUT_SIZE =
+        256 / (8 * sizeof(T));
+
+    static constexpr const int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	static void sisd_add(const T *a, const T *b, T *c) {
 		for (size_t i = 0; i < INPUT_SIZE; i++) {

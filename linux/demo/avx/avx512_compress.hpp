@@ -1,21 +1,22 @@
-template<typename T>
+template <typename T>
 struct AVX512_COMPRESS {
+    static constexpr const char* CLASS_NAME = "avx512_compress";
 
-	using ARG1_TYPE = T;
+    static constexpr size_t LANES = 512 / (8 * sizeof(T));
+    static constexpr size_t INPUT_SIZE = LANES;
 
-	static constexpr size_t LANES = 512 / (8 * sizeof(T));
+    using MASK_TYPE =
+        std::conditional_t<LANES == 8, uint8_t,
+        std::conditional_t<LANES == 16, uint16_t, void>>;
 
-	using MASK_TYPE =
-		std::conditional_t<LANES == 8, uint8_t,
-		std::conditional_t<LANES == 16, uint16_t, void>>;
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = MASK_TYPE;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
 
-	using ARG2_TYPE = MASK_TYPE;
-	using OUTPUT_TYPE = T;
-
-	static constexpr const char* CLASS_NAME = "avx512_compress";
-	static constexpr int INPUT_ARGS = 2;
-	static constexpr int INPUT_SIZE = LANES;
-	static constexpr int OUTPUT_SIZE = LANES;
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	static void sisd_compress(const T* a,
 							  const MASK_TYPE* mask_ptr,

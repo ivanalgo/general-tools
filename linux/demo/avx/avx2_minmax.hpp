@@ -1,15 +1,18 @@
-template<typename T>
+template <typename T>
 struct AVX2_MINMAX {
-    using ARG1_TYPE   = T;
-    using ARG2_TYPE   = T;
-    using OUTPUT_TYPE = T;
-
-    static constexpr int INPUT_SIZE =
-        256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-
     static constexpr const char* CLASS_NAME = "AVX2_MINMAX";
+
+    static constexpr size_t INPUT_SIZE =
+        256 / (8 * sizeof(T));
+
     static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= AVX ================= */
 
@@ -70,7 +73,7 @@ struct AVX2_MINMAX {
 
     static void sisd_max(const T* a, const T* b, T* out)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i) {
+        for (size_t i = 0; i < INPUT_SIZE; ++i) {
             if constexpr (std::is_floating_point_v<T>) {
                 if (std::isnan(a[i]) || std::isnan(b[i]))
                     out[i] = b[i];
@@ -84,7 +87,7 @@ struct AVX2_MINMAX {
 
     static void sisd_min(const T* a, const T* b, T* out)
     {
-        for (int i = 0; i < INPUT_SIZE; ++i) {
+        for (size_t i = 0; i < INPUT_SIZE; ++i) {
             if constexpr (std::is_floating_point_v<T>) {
                 if (std::isnan(a[i]) || std::isnan(b[i]))
                     out[i] = b[i];

@@ -1,12 +1,17 @@
 template <typename T>
 struct AVX512_BITWISE {
-    using ARG1_TYPE = T;
-    using ARG2_TYPE = T;
-    using OUTPUT_TYPE = T;
-    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
     static constexpr const char* CLASS_NAME = "AVX512_BITWISE";
+
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+
     static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* SISD 实现 */
 	static void sisd_and(const T* a, const T* b, T* out) {

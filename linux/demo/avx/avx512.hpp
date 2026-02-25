@@ -1,13 +1,20 @@
 template <typename T>
 struct AVX512 {
-    using ARG1_TYPE   = T;
-    using ARG2_TYPE   = T;
-    using OUTPUT_TYPE = T;
-
     static constexpr const char* CLASS_NAME = "avx512";
-    static constexpr int INPUT_ARGS = 2;
-    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
+
+    static constexpr int BIT_WIDTH = 512;
+
+    static constexpr size_t INPUT_SIZE =
+        BIT_WIDTH / (8 * sizeof(T));
+
+    static constexpr const int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= SISD ================= */
 

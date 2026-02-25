@@ -1,13 +1,19 @@
-template<typename T>
+template <typename T>
 struct AVX2_FMA {
-	using ARG1_TYPE = T;
-	using ARG2_TYPE = T;
-	using ARG3_TYPE = T;
-	using OUTPUT_TYPE = T;
-	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-	static constexpr const char* CLASS_NAME = "AVX2_FMA";
-	static constexpr int INPUT_ARGS = 3;
+    static constexpr const char* CLASS_NAME = "AVX2_FMA";
+
+    static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+    using ARG3_TYPE = T;
+    static constexpr size_t ARG3_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	/* ================= AVX ================= */
 
@@ -110,7 +116,7 @@ struct AVX2_FMA {
 						   const T* c,
 						   T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
+		for (size_t i = 0; i < INPUT_SIZE; ++i)
 			out[i] = a[i] * b[i] + c[i];
 	}
 
@@ -119,7 +125,7 @@ struct AVX2_FMA {
 						   const T* c,
 						   T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
+		for (size_t i = 0; i < INPUT_SIZE; ++i)
 			out[i] = a[i] * b[i] - c[i];
 	}
 
@@ -128,7 +134,7 @@ struct AVX2_FMA {
 							const T* c,
 							T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
+		for (size_t i = 0; i < INPUT_SIZE; ++i)
 			out[i] = -a[i] * b[i] + c[i];
 	}
 
@@ -137,7 +143,7 @@ struct AVX2_FMA {
 							const T* c,
 							T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
+		for (size_t i = 0; i < INPUT_SIZE; ++i)
 			out[i] = -a[i] * b[i] - c[i];
 	}
 

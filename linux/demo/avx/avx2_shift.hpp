@@ -3,18 +3,20 @@
 #include <type_traits>
 #include <cstdint>
 
-template<typename T>
+template <typename T>
 struct AVX2_SHIFT {
-	static_assert(std::is_same_v<T, int32_t>);
+    static constexpr const char* CLASS_NAME = "AVX2_SHIFT";
 
-	using ARG1_TYPE  = T;
-	using ARG2_TYPE  = T;
-	using OUTPUT_TYPE = T;
+    static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 
-	static constexpr int INPUT_SIZE = 8;
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-	static constexpr const char* CLASS_NAME = "AVX2_SHIFT";
-	static constexpr int INPUT_ARGS = 2;
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	/* ================= AVX ================= */
 
@@ -46,7 +48,7 @@ struct AVX2_SHIFT {
 
 	static void sisd_sll(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			uint32_t k = static_cast<uint32_t>(b[i]);
 			if (k >= 32)
 				out[i] = 0;
@@ -58,20 +60,25 @@ struct AVX2_SHIFT {
 
 	static void sisd_srl(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			int32_t k = b[i];
-			if ((k & ~31) != 0)
+			// 逻辑右移：若移位量 >= 32，通常结果为 0
+			// x86 scalar shift 若移位量 >= 32 行为未定义或只取低5位
+			// 但 AVX2 srlv 指令对于 count >= 32 会置零
+			// 我们要模拟 AVX2 行为
+			if ((k & ~31) != 0) // k < 0 || k >= 32
 				out[i] = 0;
 			else
-				out[i] = static_cast<uint32_t>(a[i]) >> k;
+				out[i] = (uint32_t)a[i] >> k;
 		}
 	}
 
 
 	static void sisd_sra(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			int32_t k = b[i];
+			// 算术右移：若移位量 >= 32，结果取决于符号位 (全0或全1)
 			if ((k & ~31) != 0)
 				out[i] = (a[i] < 0) ? -1 : 0;
 			else

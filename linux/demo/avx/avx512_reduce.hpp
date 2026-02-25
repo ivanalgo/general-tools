@@ -1,12 +1,14 @@
 template <typename T>
 struct AVX512_REDUCE {
-    using ARG1_TYPE   = T;
-    using OUTPUT_TYPE = T;
-
     static constexpr const char* CLASS_NAME = "avx512_reduce";
-    static constexpr int INPUT_ARGS = 1;
 
-    static constexpr size_t INPUT_SIZE  = 512 / (8 * sizeof(T));
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 1;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
     static constexpr size_t OUTPUT_SIZE = 1;
 
     /* ================= SISD ================= */

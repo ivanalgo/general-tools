@@ -1,21 +1,25 @@
 template <typename T>
 struct AVX512_MASK {
+    static constexpr const char* CLASS_NAME = "avx512_mask";
 
-	using ARG1_TYPE   = T;
-	using ARG2_TYPE   = T;
-	using MASK_TYPE = std::conditional_t<
-		std::is_same_v<T, double>,
-		uint8_t,
-		uint16_t
-	>;
-	using ARG3_TYPE   = MASK_TYPE;
-	using OUTPUT_TYPE = T;
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
-	static constexpr const char* CLASS_NAME = "avx512_mask";
-	static constexpr int INPUT_ARGS = 3;
+    static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
 
-	static constexpr size_t INPUT_SIZE  = 512 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
+    using MASK_TYPE = std::conditional_t<
+        std::is_same_v<T, double>,
+        uint8_t,
+        uint16_t
+    >;
+    using ARG3_TYPE = MASK_TYPE;
+    static constexpr size_t ARG3_SIZE = 1;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	/* ================= SISD ================= */
 

@@ -1,19 +1,20 @@
-template<typename T>
+template <typename T>
 struct AVX512_FMA {
-
-    using ARG1_TYPE   = T;
-    using ARG2_TYPE   = T;
-    using ARG3_TYPE   = T;
-    using OUTPUT_TYPE = T;
-
-    static constexpr size_t LANES =
-        512 / (8 * sizeof(T));
-
-    static constexpr size_t INPUT_SIZE  = LANES;
-    static constexpr size_t OUTPUT_SIZE = LANES;
-
     static constexpr const char* CLASS_NAME = "avx512_fma";
+
+    static constexpr size_t LANES = 512 / (8 * sizeof(T));
+    static constexpr size_t INPUT_SIZE = LANES;
+
     static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+    using ARG3_TYPE = T;
+    static constexpr size_t ARG3_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* ================= SISD ================= */
 

@@ -16,16 +16,20 @@ struct AVX2_CMP_BOOL_TYPE<double> {
 	using type = int64_t;
 };
 
-template<typename T>
+template <typename T>
 struct AVX2_CMP {
-	using ARG1_TYPE = T;
-	using ARG2_TYPE = T;
-	using OUTPUT_TYPE = typename AVX2_CMP_BOOL_TYPE<T>::type;
+    static constexpr const char* CLASS_NAME = "AVX2_CMP";
 
-	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-	static constexpr const char* CLASS_NAME = "AVX2_CMP";
-	static constexpr int INPUT_ARGS = 2;
+    static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	/* ================= AVX ================= */
 
@@ -83,14 +87,41 @@ struct AVX2_CMP {
 
 	static void sisd_gt(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
-			out[i] = (a[i] > b[i]) ? -1 : 0;
+		// AVX 比较结果通常是全 1 (true) 或全 0 (false)
+		// 对应整数位模式： -1 (所有位为1) 或 0
+		// 对于 float/double，也是将对应的 32/64 位设为全1
+		if constexpr (std::is_integral_v<T>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
+				out[i] = (a[i] > b[i]) ? -1 : 0;
+		} else if constexpr (std::is_same_v<T, float>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
+				int32_t val = (a[i] > b[i]) ? -1 : 0;
+				std::memcpy(&out[i], &val, sizeof(val));
+			}
+		} else if constexpr (std::is_same_v<T, double>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
+				int64_t val = (a[i] > b[i]) ? -1 : 0;
+				std::memcpy(&out[i], &val, sizeof(val));
+			}
+		}
 	}
 
 	static void sisd_eq(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i)
-			out[i] = (a[i] == b[i]) ? -1 : 0;
+		if constexpr (std::is_integral_v<T>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
+				out[i] = (a[i] == b[i]) ? -1 : 0;
+		} else if constexpr (std::is_same_v<T, float>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
+				int32_t val = (a[i] == b[i]) ? -1 : 0;
+				std::memcpy(&out[i], &val, sizeof(val));
+			}
+		} else if constexpr (std::is_same_v<T, double>) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
+				int64_t val = (a[i] == b[i]) ? -1 : 0;
+				std::memcpy(&out[i], &val, sizeof(val));
+			}
+		}
 	}
 
 	/* ================= OPS ================= */

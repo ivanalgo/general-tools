@@ -1,8 +1,6 @@
-template<typename SRC, typename DST>
+template <typename SRC, typename DST>
 struct AVX512_CONVERT {
-
-    using ARG1_TYPE   = SRC;
-    using OUTPUT_TYPE = DST;
+    static constexpr const char* CLASS_NAME = "avx512_convert";
 
     static constexpr size_t SRC_LANES =
         512 / (8 * sizeof(SRC));
@@ -10,11 +8,14 @@ struct AVX512_CONVERT {
     static constexpr size_t DST_LANES =
         512 / (8 * sizeof(DST));
 
-    static constexpr size_t INPUT_SIZE  = SRC_LANES;
-    static constexpr size_t OUTPUT_SIZE = DST_LANES;
+    static constexpr size_t INPUT_SIZE = SRC_LANES;
 
-    static constexpr const char* CLASS_NAME = "avx512_convert";
     static constexpr int INPUT_ARGS = 1;
+    using ARG1_TYPE = SRC;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = DST;
+    static constexpr size_t OUTPUT_SIZE = DST_LANES;
 
     /* ================= SISD ================= */
 

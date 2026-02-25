@@ -1,21 +1,22 @@
 template<typename A, typename B, bool SATURATE = false>
 struct AVX512_VNNI {
-
-    using ARG1_TYPE   = A;
-    using ARG2_TYPE   = B;
-    using ARG3_TYPE   = int32_t;
-    using OUTPUT_TYPE = int32_t;
-
     static constexpr const char* CLASS_NAME = "avx512_vnni";
-    static constexpr int INPUT_ARGS = 3;
-
-    /* ========== lane 计算 ========== */
 
     static constexpr size_t A_LANES = 512 / (8 * sizeof(A));
     static constexpr size_t GROUP_SIZE   = (sizeof(A) == 1 ? 4 : 2);
     static constexpr size_t OUT_LANES = A_LANES / GROUP_SIZE;
 
-    static constexpr size_t INPUT_SIZE  = A_LANES;
+    static constexpr size_t INPUT_SIZE = A_LANES;
+
+    static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = A;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = B;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+    using ARG3_TYPE = int32_t;
+    static constexpr size_t ARG3_SIZE = OUT_LANES;
+
+    using OUTPUT_TYPE = int32_t;
     static constexpr size_t OUTPUT_SIZE = OUT_LANES;
 
     /* ================= SISD ================= */

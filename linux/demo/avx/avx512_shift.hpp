@@ -1,17 +1,22 @@
 template <typename T>
 struct AVX512_SHIFT {
-    using ARG1_TYPE = T;
-    using ARG2_TYPE = T;
-    using OUTPUT_TYPE = T;
-    static constexpr int INPUT_SIZE = 512 / (8 * sizeof(T));
-	static constexpr int OUTPUT_SIZE = INPUT_SIZE;
     static constexpr const char* CLASS_NAME = "AVX512_SHIFT";
+
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+
     static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* SISD 实现 */
 	static void sisd_sll(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			uint32_t k = static_cast<uint32_t>(b[i]);
 			if (k >= 32)
 				out[i] = 0;
@@ -23,7 +28,7 @@ struct AVX512_SHIFT {
 
 	static void sisd_srl(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			int32_t k = b[i];
 			if ((k & ~31) != 0)
 				out[i] = 0;
@@ -35,7 +40,7 @@ struct AVX512_SHIFT {
 
 	static void sisd_sra(const T* a, const T* b, T* out)
 	{
-		for (int i = 0; i < INPUT_SIZE; ++i) {
+		for (size_t i = 0; i < INPUT_SIZE; ++i) {
 			int32_t k = b[i];
 			if ((k & ~31) != 0)
 				out[i] = (a[i] < 0) ? -1 : 0;

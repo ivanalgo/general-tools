@@ -1,17 +1,29 @@
 template <typename T>
 struct AVX512_BLEND {
-    using ARG1_TYPE = T;
-    using ARG2_TYPE = T;
-	using ARG3_TYPE = std::conditional_t<
-        std::is_same_v<T, double>,
-        uint8_t,        // __mmask8
-        uint16_t        // __mmask16 (float / int32)
-    >;
-    using OUTPUT_TYPE = T;
-    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
-    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
     static constexpr const char* CLASS_NAME = "AVX512_BLEND";
-    static constexpr int INPUT_ARGS = 3; // a, b, mask
+
+    static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 3;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+    // mask 类型
+    // 64 lanes  -> uint64_t  (对应 __mmask64)
+    // 32 lanes  -> uint32_t  (对应 __mmask32)
+    // 16 lanes  -> uint16_t  (对应 __mmask16)
+    // 8 lanes   -> uint8_t   (对应 __mmask8)
+    using ARG3_TYPE =
+        std::conditional_t<INPUT_SIZE == 64, uint64_t,   // __mmask64
+        std::conditional_t<INPUT_SIZE == 32, uint32_t,   // __mmask32
+        std::conditional_t<INPUT_SIZE == 16, uint16_t,   // __mmask16
+        std::conditional_t<INPUT_SIZE == 8,  uint8_t,
+        void>>>>;
+    static constexpr size_t ARG3_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
     /* SISD 实现 */
     static void sisd_blend(const T* a, const T* b, const ARG3_TYPE *mask, T* out) {

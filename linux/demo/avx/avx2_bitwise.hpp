@@ -1,13 +1,17 @@
-template<typename T>
+template <typename T>
 struct AVX2_BITWISE {
-	using ARG1_TYPE  = T;
-	using ARG2_TYPE  = T;
-	using OUTPUT_TYPE = T;
+    static constexpr const char* CLASS_NAME = "AVX2_BITWISE";
 
-	static constexpr int INPUT_SIZE = 256 / (8 * sizeof(T));
-	static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
-	static constexpr const char* CLASS_NAME = "AVX2_BITWISE";
-	static constexpr int INPUT_ARGS = 2;
+    static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
+
+    static constexpr int INPUT_ARGS = 2;
+    using ARG1_TYPE = T;
+    static constexpr size_t ARG1_SIZE = INPUT_SIZE;
+    using ARG2_TYPE = T;
+    static constexpr size_t ARG2_SIZE = INPUT_SIZE;
+
+    using OUTPUT_TYPE = T;
+    static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
 	/* ================= AVX ================= */
 
@@ -120,10 +124,10 @@ struct AVX2_BITWISE {
 	static void sisd_and(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
 		if constexpr (std::is_same_v<T, int>) {
-			for (int i = 0; i < INPUT_SIZE; ++i)
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
 				out[i] = a[i] & b[i];
 		} else if constexpr (std::is_same_v<T, float>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint32_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -131,7 +135,7 @@ struct AVX2_BITWISE {
 				std::memcpy(&out[i], &uc, sizeof(out[i]));
 			}
 		} else if constexpr (std::is_same_v<T, double>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint64_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -144,10 +148,10 @@ struct AVX2_BITWISE {
 	static void sisd_or(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
 		if constexpr (std::is_same_v<T, int>) {
-			for (int i = 0; i < INPUT_SIZE; ++i)
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
 				out[i] = a[i] | b[i];
 		} else if constexpr (std::is_same_v<T, float>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint32_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -155,7 +159,7 @@ struct AVX2_BITWISE {
 				std::memcpy(&out[i], &uc, sizeof(out[i]));
 			}
 		} else if constexpr (std::is_same_v<T, double>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint64_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -168,10 +172,10 @@ struct AVX2_BITWISE {
 	static void sisd_xor(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
 		if constexpr (std::is_same_v<T, int>) {
-			for (int i = 0; i < INPUT_SIZE; ++i)
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
 				out[i] = a[i] ^ b[i];
 		} else if constexpr (std::is_same_v<T, float>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint32_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -179,7 +183,7 @@ struct AVX2_BITWISE {
 				std::memcpy(&out[i], &uc, sizeof(out[i]));
 			}
 		} else if constexpr (std::is_same_v<T, double>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint64_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -192,10 +196,10 @@ struct AVX2_BITWISE {
 	static void sisd_andnot(const T* a, const T* b, OUTPUT_TYPE* out)
 	{
 		if constexpr (std::is_same_v<T, int>) {
-			for (int i = 0; i < INPUT_SIZE; ++i)
+			for (size_t i = 0; i < INPUT_SIZE; ++i)
 				out[i] = (~a[i]) & b[i];
 		} else if constexpr (std::is_same_v<T, float>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint32_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
@@ -203,7 +207,7 @@ struct AVX2_BITWISE {
 				std::memcpy(&out[i], &uc, sizeof(out[i]));
 			}
 		} else if constexpr (std::is_same_v<T, double>) {
-			for (int i = 0; i < INPUT_SIZE; ++i) {
+			for (size_t i = 0; i < INPUT_SIZE; ++i) {
 				uint64_t ua, ub, uc;
 				std::memcpy(&ua, &a[i], sizeof(ua));
 				std::memcpy(&ub, &b[i], sizeof(ub));
