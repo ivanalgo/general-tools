@@ -8,6 +8,23 @@
 #include <chrono>
 #include <tuple>
 #include <utility>
+#include <string>
+#include <typeinfo>
+
+template <typename T>
+std::string GetTypeName() {
+    if constexpr (std::is_same_v<T, int>) return "int";
+    else if constexpr (std::is_same_v<T, float>) return "float";
+    else if constexpr (std::is_same_v<T, double>) return "double";
+    else if constexpr (std::is_same_v<T, int8_t>) return "int8_t";
+    else if constexpr (std::is_same_v<T, uint8_t>) return "uint8_t";
+    else if constexpr (std::is_same_v<T, int16_t>) return "int16_t";
+    else if constexpr (std::is_same_v<T, uint16_t>) return "uint16_t";
+    else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+    else if constexpr (std::is_same_v<T, uint64_t>) return "uint64_t";
+    else return typeid(T).name();
+}
+
 
 template <typename ARG1_TYPE, typename OUT_TYPE>
 struct OpEntry1 {
@@ -143,6 +160,16 @@ template <typename Class> struct ArgType<Class, 0> { using type = typename Class
 template <typename Class> struct ArgType<Class, 1> { using type = typename Class::ARG2_TYPE; };
 template <typename Class> struct ArgType<Class, 2> { using type = typename Class::ARG3_TYPE; };
 
+template <typename Class, size_t... Is>
+void PrintOpSignatureHelper(const char* op_name, std::index_sequence<Is...>) {
+    std::cout << "<";
+    ((std::cout << (Is == 0 ? "" : ", ") 
+                << GetTypeName<typename ArgType<Class, Is>::type>() 
+                << "[" << GetArgSize<Class, Is>() << "]"), ...);
+    std::cout << " -> " << GetTypeName<typename Class::OUTPUT_TYPE>() 
+              << "[" << Class::OUTPUT_SIZE << "]>";
+}
+
 template <typename T, size_t N>
 auto& AsCArray(std::array<T, N>& arr) {
     return *reinterpret_cast<T(*)[N]>(arr.data());
@@ -182,7 +209,9 @@ void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
         op.sisd(args.data()..., sisd_out);
     }, inputs);
 
-    std::cout << Class::CLASS_NAME << ":" << op.name << "\n";
+    std::cout << Class::CLASS_NAME << ":" << op.name;
+    PrintOpSignatureHelper<Class>(op.name, std::make_index_sequence<Class::INPUT_ARGS>{});
+    std::cout << "\n";
     
     const char* arg_names[] = {"a = ", "b = ", "c = "};
     std::apply([&](auto&... args) {
