@@ -135,3 +135,13 @@ struct AVX2_CMP {
 		};
 	}
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX2_CMP_INT = AVX2_CMP<int>;
+REGISTER_TEST(AVX2_CMP_INT)
+using AVX2_CMP_FLOAT = AVX2_CMP<float>;
+REGISTER_TEST(AVX2_CMP_FLOAT)
+using AVX2_CMP_DOUBLE = AVX2_CMP<double>;
+REGISTER_TEST(AVX2_CMP_DOUBLE)
+#endif

@@ -98,3 +98,9 @@ struct AVX2_SHIFT {
 		};
 	}
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX2_SHIFT_INT = AVX2_SHIFT<int>;
+REGISTER_TEST(AVX2_SHIFT_INT)
+#endif

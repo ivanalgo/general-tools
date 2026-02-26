@@ -160,3 +160,11 @@ struct AVX2_FMA {
 		};
 	}
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX2_FMA_FLOAT = AVX2_FMA<float>;
+REGISTER_TEST(AVX2_FMA_FLOAT)
+using AVX2_FMA_DOUBLE = AVX2_FMA<double>;
+REGISTER_TEST(AVX2_FMA_DOUBLE)
+#endif

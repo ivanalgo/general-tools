@@ -167,3 +167,13 @@ struct AVX512 {
         }
     }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX512_INT = AVX512<int>;
+REGISTER_TEST(AVX512_INT)
+using AVX512_FLOAT = AVX512<float>;
+REGISTER_TEST(AVX512_FLOAT)
+using AVX512_DOUBLE = AVX512<double>;
+REGISTER_TEST(AVX512_DOUBLE)
+#endif

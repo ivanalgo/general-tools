@@ -133,21 +133,29 @@ struct AVX2 {
 		}
 	}
 
-	static constexpr auto make_ops()
-	{
-		if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
-			return std::array{
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "div", avx_div, sisd_div },
-			};
-		} else {
-			return std::array{
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
-				OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
-			};
-		}
-	}
+    static constexpr auto make_ops()
+    {
+        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+            return std::array{
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "div", avx_div, sisd_div },
+            };
+        } else {
+            return std::array{
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
+            };
+        }
+    }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX2_INT = AVX2<int>;
+REGISTER_TEST(AVX2_INT)
+using AVX2_FLOAT = AVX2<float>;
+REGISTER_TEST(AVX2_FLOAT)
+#endif

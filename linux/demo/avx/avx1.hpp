@@ -157,3 +157,13 @@ struct AVX {
         }
     }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX_INT = AVX<int>;
+REGISTER_TEST(AVX_INT)
+using AVX_FLOAT = AVX<float>;
+REGISTER_TEST(AVX_FLOAT)
+using AVX_DOUBLE = AVX<double>;
+REGISTER_TEST(AVX_DOUBLE)
+#endif

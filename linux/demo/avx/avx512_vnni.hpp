@@ -86,3 +86,22 @@ struct AVX512_VNNI {
         };
     }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+// INT8 for vnni in reference
+using AVX512_VNNI_U8 = AVX512_VNNI<uint8_t, int8_t>;
+REGISTER_TEST(AVX512_VNNI_U8)
+// REGISTER_TEST(AVX512_VNNI<uint8_t, int8_t, true>) // Template macro limitation, see below
+// INT16 for vnni in reference
+using AVX512_VNNI_I16 = AVX512_VNNI<int16_t, int16_t>;
+REGISTER_TEST(AVX512_VNNI_I16)
+// REGISTER_TEST(AVX512_VNNI<int16_t, int16_t, true>)
+
+// Macro can't handle commas in template args directly without varargs or alias
+// Manual registration for multi-arg templates
+using AVX512_VNNI_U8_SAT = AVX512_VNNI<uint8_t, int8_t, true>;
+REGISTER_TEST(AVX512_VNNI_U8_SAT)
+using AVX512_VNNI_I16_SAT = AVX512_VNNI<int16_t, int16_t, true>;
+REGISTER_TEST(AVX512_VNNI_I16_SAT)
+#endif

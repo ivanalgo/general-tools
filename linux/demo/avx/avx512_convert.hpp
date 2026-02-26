@@ -93,3 +93,14 @@ struct AVX512_CONVERT {
         };
     }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+// These tests are disabled in original code with #if 0
+#if 0
+REGISTER_TEST(AVX512_CONVERT<int, float>)
+REGISTER_TEST(AVX512_CONVERT<int, double>)
+REGISTER_TEST(AVX512_CONVERT<float, int>)
+REGISTER_TEST(AVX512_CONVERT<double, int>)
+#endif
+#endif

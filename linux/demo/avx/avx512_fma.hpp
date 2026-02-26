@@ -72,3 +72,11 @@ struct AVX512_FMA {
         };
     }
 };
+
+// Register tests
+#ifdef REGISTER_TEST
+using AVX512_FMA_FLOAT = AVX512_FMA<float>;
+REGISTER_TEST(AVX512_FMA_FLOAT)
+using AVX512_FMA_DOUBLE = AVX512_FMA<double>;
+REGISTER_TEST(AVX512_FMA_DOUBLE)
+#endif
