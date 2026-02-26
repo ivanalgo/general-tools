@@ -63,6 +63,11 @@ struct OpEntry3 {
 #include "avx512_convert.hpp"
 #include "avx512_fma.hpp"
 #include "avx512_vnni.hpp"
+#include "avx512_scatter_gather.hpp"
+#include "avx512_ternary.hpp"
+#include "avx512_conflict.hpp"
+#include "avx512_math.hpp"
+#include "avx512_popcnt.hpp"
 
 // Auto-Registration of Tests is now handled in individual header files
 
