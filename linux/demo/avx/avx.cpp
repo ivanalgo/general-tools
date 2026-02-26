@@ -13,12 +13,74 @@
 #include <vector>
 #include <string_view>
 #include <algorithm>
+#include <map>
+#include <set>
 
 struct TestConfig {
     std::string category_filter; // "avx", "avx2", "avx512" or "" (all)
     std::string class_filter;    // match for CLASS_TYPE (e.g. "cmp", "bitwise")
     std::string op_filter;       // match for op name
     std::string type_filter;     // partial match for type signature
+    bool help_mode = false;      // If true, collect info and print help
+};
+
+class HelpCollector {
+public:
+    static HelpCollector& Instance() {
+        static HelpCollector instance;
+        return instance;
+    }
+
+    void Add(const std::string& category, const std::string& class_type, const std::string& op_name) {
+        categories.insert(category);
+        category_classes[category].insert(class_type);
+        class_ops[{category, class_type}].insert(op_name);
+    }
+
+    void PrintHelp(const TestConfig& config, const char* prog_name) {
+        std::cout << "Usage: " << prog_name << " [options]\n\n";
+        
+        if (config.category_filter.empty()) {
+            std::cout << "Available Categories (use --avx<version> --help to see details):\n";
+            for (const auto& cat : categories) {
+                std::cout << "  --avx" << (cat.substr(0, 3) == "avx" ? cat.substr(3) : cat) << "\n";
+            }
+        } else {
+            std::string cat = config.category_filter;
+            if (categories.find(cat) == categories.end()) {
+                std::cout << "Error: Category '" << cat << "' not found.\n";
+                return;
+            }
+
+            if (config.class_filter.empty()) {
+                std::cout << "Available Classes in " << cat << " (use --class=<name> --help to see operations):\n";
+                for (const auto& cls : category_classes[cat]) {
+                    std::cout << "  --class=" << cls << "\n";
+                }
+            } else {
+                std::string cls = config.class_filter;
+                if (category_classes[cat].find(cls) == category_classes[cat].end()) {
+                    std::cout << "Error: Class '" << cls << "' not found in category '" << cat << "'.\n";
+                    return;
+                }
+
+                std::cout << "Available Operations in " << cat << "::" << cls << ":\n";
+                for (const auto& op : class_ops[{cat, cls}]) {
+                    std::cout << "  --function=" << op << "\n";
+                }
+            }
+        }
+        
+        std::cout << "\nGeneral Options:\n";
+        std::cout << "  --function=<name>      Filter by operation name (partial match)\n";
+        std::cout << "  --type=<sig>     Filter by type signature (partial match)\n";
+        std::cout << "  --help           Show this help message\n";
+    }
+
+private:
+    std::set<std::string> categories;
+    std::map<std::string, std::set<std::string>> category_classes;
+    std::map<std::pair<std::string, std::string>, std::set<std::string>> class_ops;
 };
 
 template <typename T>
@@ -269,45 +331,21 @@ template <typename Class>
 void RandomTest(const TestConfig& config)
 {
 	constexpr auto ops = Class::make_ops();
+    
+    if (config.help_mode) {
+        for (const auto& op : ops) {
+            HelpCollector::Instance().Add(Class::CATEGORY, Class::CLASS_TYPE, op.name);
+        }
+        return;
+    }
+
 	for (const auto& op : ops) {
 		RunTestImpl<Class>(op, config, std::make_index_sequence<Class::INPUT_ARGS>{});
 	}
 }
 
-void PrintHelp(const char* prog_name) {
-    std::cout << "Usage: " << prog_name << " [options]\n";
-    std::cout << "Options:\n";
-    std::cout << "  --avx<version>   Filter by AVX category (avx, avx2, avx512)\n";
-    std::cout << "  --class=<name>   Filter by class type (arithmetic, bitwise, blend, cmp, compress, convert, fma, mask, minmax, permute, reduce, shift, vnni)\n";
-    std::cout << "  --op=<name>      Filter by operation name (partial match)\n";
-    std::cout << "  --type=<sig>     Filter by type signature (partial match)\n";
-    std::cout << "  --help           Show this help message\n";
-    std::cout << "\n";
-    std::cout << "Examples:\n";
-    std::cout << "  " << prog_name << " --avx2\n";
-    std::cout << "  " << prog_name << " --avx512 --class=cmp\n";
-    std::cout << "  " << prog_name << " --op=add\n";
-}
-
-int main(int argc, char** argv)
+void RunAllTests(const TestConfig& config)
 {
-    TestConfig config;
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--help") {
-            PrintHelp(argv[0]);
-            return 0;
-        } else if (arg.find("--avx") == 0) {
-            config.category_filter = arg.substr(2); // "avx", "avx2", "avx512"
-        } else if (arg.find("--class=") == 0) {
-            config.class_filter = arg.substr(8);
-        } else if (arg.find("--op=") == 0) {
-            config.op_filter = arg.substr(5);
-        } else if (arg.find("--type=") == 0) {
-            config.type_filter = arg.substr(7);
-        }
-    }
-
 	RandomTest<AVX<int>>(config);
 	RandomTest<AVX<float>>(config);
 	RandomTest<AVX<double>>(config);
@@ -377,6 +415,32 @@ int main(int argc, char** argv)
 	// INT16 for vnni in reference
 	RandomTest<AVX512_VNNI<int16_t, int16_t>>(config);
 	RandomTest<AVX512_VNNI<int16_t, int16_t, true>>(config);
+}
 
+int main(int argc, char** argv)
+{
+    TestConfig config;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            config.help_mode = true;
+        } else if (arg.find("--avx") == 0) {
+            config.category_filter = arg.substr(2); // "avx", "avx2", "avx512"
+        } else if (arg.find("--class=") == 0) {
+            config.class_filter = arg.substr(8);
+        } else if (arg.find("--function=") == 0) {
+            config.op_filter = arg.substr(11);
+        } else if (arg.find("--type=") == 0) {
+            config.type_filter = arg.substr(7);
+        }
+    }
 
+    if (config.help_mode) {
+        RunAllTests(config); // Collect info
+        HelpCollector::Instance().PrintHelp(config, argv[0]);
+        return 0;
+    }
+
+    RunAllTests(config);
+    return 0;
 }
