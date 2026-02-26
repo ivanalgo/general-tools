@@ -148,17 +148,21 @@ bool CmpResult(T (&a)[N], T (&b)[N], size_t& first_failure_idx) {
 // ----------------------------------------------------------------------
 
 template <typename T, size_t N>
-void Debug(const char *token, T (&a)[N]) {
-    std::cout << token;
+void DebugAligned(const char *token, T (&a)[N], int width = 4) {
+    std::cout << std::left << std::setw(12) << token;
     for (size_t i = 0; i < N; ++i) {
-        // Promote int8_t/uint8_t to int for printing
         if constexpr (sizeof(T) == 1) {
-            std::cout << +a[i] << " ";
+            std::cout << std::right << std::setw(width) << +a[i] << " ";
         } else {
-            std::cout << a[i] << " ";
+            std::cout << std::right << std::setw(width) << a[i] << " ";
         }
     }
     std::cout << "\n";
+}
+
+template <typename T, size_t N>
+void Debug(const char *token, T (&a)[N]) {
+    DebugAligned(token, a, 1); // Legacy mode, no specific alignment
 }
 
 template <typename T, size_t N>
@@ -243,42 +247,95 @@ void RunTestImpl(const Op& op, const TestConfig& config, std::index_sequence<Is.
     size_t failure_idx = 0;
     bool pass = CmpResult(avx_out, sisd_out, failure_idx);
 
+    // Calculate dynamic column width
+    int col_width = 8; // default width
+    if constexpr (std::is_same_v<typename Class::OUTPUT_TYPE, int8_t> || std::is_same_v<typename Class::OUTPUT_TYPE, uint8_t>) col_width = 4;
+    else if constexpr (std::is_same_v<typename Class::OUTPUT_TYPE, int16_t> || std::is_same_v<typename Class::OUTPUT_TYPE, uint16_t>) col_width = 6;
+    else if constexpr (std::is_floating_point_v<typename Class::OUTPUT_TYPE>) col_width = 12;
+
+    auto print_debug_info = [&](const char* result_label) {
+        const char* arg_names[] = {"  a = ", "  b = ", "  c = "};
+        
+        // Handle input alignment based on output ratio (for VNNI etc.)
+        std::apply([&](auto&... args) {
+            size_t idx = 0;
+            auto print_arg = [&](auto& arg) {
+                // Calculate scale factor: InputSize / OutputSize
+                // If scale > 1, we print multiple input values per output column
+                constexpr size_t in_size = std::tuple_size_v<std::decay_t<decltype(arg)>>;
+                constexpr size_t out_size = Class::OUTPUT_SIZE;
+                constexpr size_t ratio = (out_size > 0) ? (in_size / out_size) : 1;
+                
+                // If simple 1:1 mapping, use standard width
+                if (ratio <= 1) {
+                     DebugAligned(arg_names[idx++], AsCArray(arg), col_width);
+                } else {
+                    // For VNNI (e.g. 4 bytes -> 1 int), we need to format carefully
+                    // We want visual alignment:  | a0 a1 a2 a3 |
+                    //                            |    result   |
+                    // So we print inputs with smaller width but grouped
+                    
+                    std::cout << std::left << std::setw(12) << arg_names[idx++];
+                    auto& c_arr = AsCArray(arg);
+                    for (size_t i = 0; i < in_size; ++i) {
+                         // Print value
+                         if constexpr (sizeof(typename std::decay_t<decltype(arg)>::value_type) == 1)
+                            std::cout << std::right << std::setw(3) << +c_arr[i];
+                         else
+                            std::cout << std::right << std::setw(col_width/ratio) << c_arr[i];
+                         
+                         // Add spacer
+                         if ((i + 1) % ratio == 0) std::cout << " | ";
+                         else std::cout << " ";
+                    }
+                    std::cout << "\n";
+                }
+            };
+            (print_arg(args), ...);
+        }, inputs);
+
+        // Print Result with alignment
+        // For VNNI, we need to match the visual center of the group above
+        // | v0 v1 v2 v3 |
+        // |    res      |
+        // The group width above is approx: ratio * (val_width + 1) + 2
+        
+        std::cout << std::left << std::setw(12) << result_label;
+        for (size_t i = 0; i < Class::OUTPUT_SIZE; ++i) {
+             // For VNNI case (ratio 4), the group above takes about 4*4 + 3 = 19 chars
+             // We want to center the result in that space
+             
+             // Simple heuristic: just use a wider column for result if ratio exist
+             // Check arg1 ratio
+             constexpr size_t in1_size = GetArgSize<Class, 0>();
+             constexpr size_t ratio = in1_size / Class::OUTPUT_SIZE;
+             
+             int effective_width = col_width;
+             if (ratio > 1) {
+                 // Calculate width of one input group: (3+1)*4 + 3 = 19 chars for VNNI
+                 // 3 is val width, +1 space, *4 count, +3 " | "
+                 effective_width = (3 + 1) * ratio + 3 - 1; 
+             }
+             
+             std::cout << std::right << std::setw(effective_width) << avx_out[i] << " ";
+        }
+        std::cout << "\n";
+    };
+
     if (!pass) {
         std::cout << Color::Red << "[FAIL] " << Color::Reset 
                   << category << ":" << class_type << ":" << op_name << type_sig << "\n";
         
-        const char* arg_names[] = {"  Arg0 = ", "  Arg1 = ", "  Arg2 = "};
-        std::apply([&](auto&... args) {
-            size_t idx = 0;
-            ((Debug(arg_names[idx++], AsCArray(args))), ...);
-        }, inputs);
+        print_debug_info("  result = "); // Show actual result (AVX)
+        DebugAligned("  expected = ", sisd_out, col_width); // Show expected (SISD) - might need alignment fix too but let's stick to simple for now
 
-        Debug("  AVX  = ", avx_out);
-        Debug("  SISD = ", sisd_out);
         std::cout << "  Diff at index " << failure_idx << "\n";
         std::cout << "--------------------------------------------------\n";
     } else {
-        // Print success only if verbose or explicitly requested (optional)
-        // For now, mimic original behavior: print inputs/outputs always?
-        // Or maybe just print a summary line? 
-        // The original code printed everything. Let's keep printing but make it look nicer.
-        
         std::cout << Color::Green << "[PASS] " << Color::Reset 
                   << category << ":" << class_type << ":" << op_name << type_sig << "\n";
 
-        // Print details only if config.verbose (TODO: add verbose flag) or keep original behavior
-        // Original behavior was always print.
-        const char* arg_names[] = {"  a = ", "  b = ", "  c = "};
-        std::apply([&](auto&... args) {
-            size_t idx = 0;
-            ((Debug(arg_names[idx++], AsCArray(args))), ...);
-        }, inputs);
-
-        char out_name[] = "  avx_? = ";
-        out_name[6] = 'a' + sizeof...(Is) + 1; // 'b', 'c', 'd'
-        Debug(out_name, avx_out);
-        
-        // Debug("  sisd = ", sisd_out); // SISD output is redundant if they match
+        print_debug_info("  result = ");
     }
 }
 
