@@ -1,6 +1,7 @@
 template <typename SRC, typename DST>
 struct AVX512_CONVERT {
-    static constexpr const char* CLASS_NAME = "avx512_convert";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "convert";
 
     static constexpr size_t SRC_LANES =
         512 / (8 * sizeof(SRC));
@@ -85,7 +86,7 @@ struct AVX512_CONVERT {
     {
         return std::array{
             OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{
-                "avx512 convert",
+                "convert",
                 avx_convert,
                 sisd_convert
             }

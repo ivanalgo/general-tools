@@ -1,6 +1,7 @@
 template <typename T>
 struct AVX512_FMA {
-    static constexpr const char* CLASS_NAME = "avx512_fma";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "fma";
 
     static constexpr size_t LANES = 512 / (8 * sizeof(T));
     static constexpr size_t INPUT_SIZE = LANES;
@@ -64,7 +65,7 @@ struct AVX512_FMA {
     {
         return std::array{
             OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-                "avx512 fma",
+                "fma",
                 avx_fma,
                 sisd_fma
             }

@@ -10,6 +10,16 @@
 #include <utility>
 #include <string>
 #include <typeinfo>
+#include <vector>
+#include <string_view>
+#include <algorithm>
+
+struct TestConfig {
+    std::string category_filter; // "avx", "avx2", "avx512" or "" (all)
+    std::string class_filter;    // match for CLASS_TYPE (e.g. "cmp", "bitwise")
+    std::string op_filter;       // match for op name
+    std::string type_filter;     // partial match for type signature
+};
 
 template <typename T>
 std::string GetTypeName() {
@@ -160,16 +170,6 @@ template <typename Class> struct ArgType<Class, 0> { using type = typename Class
 template <typename Class> struct ArgType<Class, 1> { using type = typename Class::ARG2_TYPE; };
 template <typename Class> struct ArgType<Class, 2> { using type = typename Class::ARG3_TYPE; };
 
-template <typename Class, size_t... Is>
-void PrintOpSignatureHelper(const char* op_name, std::index_sequence<Is...>) {
-    std::cout << "<";
-    ((std::cout << (Is == 0 ? "" : ", ") 
-                << GetTypeName<typename ArgType<Class, Is>::type>() 
-                << "[" << GetArgSize<Class, Is>() << "]"), ...);
-    std::cout << " -> " << GetTypeName<typename Class::OUTPUT_TYPE>() 
-              << "[" << Class::OUTPUT_SIZE << "]>";
-}
-
 template <typename T, size_t N>
 auto& AsCArray(std::array<T, N>& arr) {
     return *reinterpret_cast<T(*)[N]>(arr.data());
@@ -195,8 +195,46 @@ void InitArg(std::array<T, N>& arr) {
     }
 }
 
+template <typename Class, size_t... Is>
+std::string GetOpSignature(const char* op_name, std::index_sequence<Is...>) {
+    std::string sig = "<";
+    auto append_arg = [&](auto i) {
+        if (i != 0) sig += ", ";
+        sig += GetTypeName<typename ArgType<Class, decltype(i)::value>::type>();
+        sig += "[";
+        sig += std::to_string(GetArgSize<Class, decltype(i)::value>());
+        sig += "]";
+    };
+    (append_arg(std::integral_constant<size_t, Is>{}), ...);
+    sig += " -> ";
+    sig += GetTypeName<typename Class::OUTPUT_TYPE>();
+    sig += "[";
+    sig += std::to_string(Class::OUTPUT_SIZE);
+    sig += "]>";
+    return sig;
+}
+
 template <typename Class, typename Op, size_t... Is>
-void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
+void RunTestImpl(const Op& op, const TestConfig& config, std::index_sequence<Is...>) {
+    std::string category = Class::CATEGORY;
+    std::string class_type = Class::CLASS_TYPE;
+    std::string op_name = op.name;
+    std::string type_sig = GetOpSignature<Class>(op.name, std::index_sequence<Is...>{});
+
+    // Check filters
+    if (!config.category_filter.empty()) {
+        if (category != config.category_filter) return;
+    }
+    if (!config.class_filter.empty()) {
+         if (class_type != config.class_filter) return;
+    }
+    if (!config.op_filter.empty()) {
+        if (op_name.find(config.op_filter) == std::string::npos) return;
+    }
+    if (!config.type_filter.empty()) {
+        if (type_sig.find(config.type_filter) == std::string::npos) return;
+    }
+
     std::tuple<std::array<typename ArgType<Class, Is>::type, GetArgSize<Class, Is>()>...> inputs;
 
     (InitArg<Class, Is>(std::get<Is>(inputs)), ...);
@@ -209,9 +247,7 @@ void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
         op.sisd(args.data()..., sisd_out);
     }, inputs);
 
-    std::cout << Class::CLASS_NAME << ":" << op.name;
-    PrintOpSignatureHelper<Class>(op.name, std::make_index_sequence<Class::INPUT_ARGS>{});
-    std::cout << "\n";
+    std::cout << category << ":" << class_type << ":" << op_name << type_sig << "\n";
     
     const char* arg_names[] = {"a = ", "b = ", "c = "};
     std::apply([&](auto&... args) {
@@ -230,85 +266,117 @@ void RunTestImpl(const Op& op, std::index_sequence<Is...>) {
 }
 
 template <typename Class>
-void RandomTest()
+void RandomTest(const TestConfig& config)
 {
 	constexpr auto ops = Class::make_ops();
 	for (const auto& op : ops) {
-		RunTestImpl<Class>(op, std::make_index_sequence<Class::INPUT_ARGS>{});
+		RunTestImpl<Class>(op, config, std::make_index_sequence<Class::INPUT_ARGS>{});
 	}
 }
 
-int main()
+void PrintHelp(const char* prog_name) {
+    std::cout << "Usage: " << prog_name << " [options]\n";
+    std::cout << "Options:\n";
+    std::cout << "  --avx<version>   Filter by AVX category (avx, avx2, avx512)\n";
+    std::cout << "  --class=<name>   Filter by class type (arithmetic, bitwise, blend, cmp, compress, convert, fma, mask, minmax, permute, reduce, shift, vnni)\n";
+    std::cout << "  --op=<name>      Filter by operation name (partial match)\n";
+    std::cout << "  --type=<sig>     Filter by type signature (partial match)\n";
+    std::cout << "  --help           Show this help message\n";
+    std::cout << "\n";
+    std::cout << "Examples:\n";
+    std::cout << "  " << prog_name << " --avx2\n";
+    std::cout << "  " << prog_name << " --avx512 --class=cmp\n";
+    std::cout << "  " << prog_name << " --op=add\n";
+}
+
+int main(int argc, char** argv)
 {
-	RandomTest<AVX<int>>();
-	RandomTest<AVX<float>>();
-	RandomTest<AVX<double>>();
-	RandomTest<AVX2<int>>();
-	RandomTest<AVX2<float>>();
-	RandomTest<AVX2_FMA<float>>();
-	RandomTest<AVX2_FMA<double>>();
-	RandomTest<AVX2_CMP<int>>();
-	RandomTest<AVX2_CMP<float>>();
-	RandomTest<AVX2_CMP<double>>();
-	RandomTest<AVX2_BITWISE<int>>();
-	RandomTest<AVX2_BITWISE<float>>();
-	RandomTest<AVX2_BITWISE<double>>();
-	RandomTest<AVX2_SHIFT<int>>();
-	RandomTest<AVX2_BLEND<int>>();
-	RandomTest<AVX2_BLEND<float>>();
-	RandomTest<AVX2_BLEND<double>>();
-	RandomTest<AVX2_MINMAX<int>>();
-	RandomTest<AVX2_MINMAX<float>>();
-	RandomTest<AVX2_MINMAX<double>>();
-	RandomTest<AVX2_PERMUTE::SHUFFLE_0123<int>>();
-	RandomTest<AVX2_PERMUTE::UNPACKLO<int>>();
-	RandomTest<AVX2_PERMUTE::UNPACKHI<int>>();
-	RandomTest<AVX2_PERMUTE::SWAP_LANES<int>>();
-	RandomTest<AVX2_PERMUTE::PERMUTEVAR<int>>();
-	RandomTest<AVX512<int>>();
-	RandomTest<AVX512<float>>();
-	RandomTest<AVX512<double>>();
-	RandomTest<AVX512_CMP<int>>();
-	RandomTest<AVX512_CMP<float>>();
-	RandomTest<AVX512_CMP<double>>();
-    RandomTest<AVX512_BITWISE<int>>();
-    RandomTest<AVX512_BITWISE<float>>();
-    RandomTest<AVX512_BITWISE<double>>();
-    RandomTest<AVX512_SHIFT<int>>();
-    RandomTest<AVX512_BLEND<int>>();
-    RandomTest<AVX512_BLEND<float>>();
-    RandomTest<AVX512_BLEND<double>>();
-    RandomTest<AVX512_PERMUTE<int>>();
-    RandomTest<AVX512_PERMUTE<float>>();
-    RandomTest<AVX512_PERMUTE<double>>();
-    RandomTest<AVX512_CMP<int>>();
-    RandomTest<AVX512_CMP<float>>();
-    RandomTest<AVX512_CMP<double>>();
-	RandomTest<AVX512_REDUCE<int>>();
-	RandomTest<AVX512_REDUCE<float>>();
-	RandomTest<AVX512_REDUCE<double>>();
-	RandomTest<AVX512_MASK<int>>();
-	RandomTest<AVX512_MASK<float>>();
-	RandomTest<AVX512_MASK<double>>();
-	RandomTest<AVX512_COMPRESS<int>>();
-	RandomTest<AVX512_COMPRESS<float>>();
-	RandomTest<AVX512_COMPRESS<double>>();
+    TestConfig config;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            PrintHelp(argv[0]);
+            return 0;
+        } else if (arg.find("--avx") == 0) {
+            config.category_filter = arg.substr(2); // "avx", "avx2", "avx512"
+        } else if (arg.find("--class=") == 0) {
+            config.class_filter = arg.substr(8);
+        } else if (arg.find("--op=") == 0) {
+            config.op_filter = arg.substr(5);
+        } else if (arg.find("--type=") == 0) {
+            config.type_filter = arg.substr(7);
+        }
+    }
+
+	RandomTest<AVX<int>>(config);
+	RandomTest<AVX<float>>(config);
+	RandomTest<AVX<double>>(config);
+	RandomTest<AVX2<int>>(config);
+	RandomTest<AVX2<float>>(config);
+	RandomTest<AVX2_FMA<float>>(config);
+	RandomTest<AVX2_FMA<double>>(config);
+	RandomTest<AVX2_CMP<int>>(config);
+	RandomTest<AVX2_CMP<float>>(config);
+	RandomTest<AVX2_CMP<double>>(config);
+	RandomTest<AVX2_BITWISE<int>>(config);
+	RandomTest<AVX2_BITWISE<float>>(config);
+	RandomTest<AVX2_BITWISE<double>>(config);
+	RandomTest<AVX2_SHIFT<int>>(config);
+	RandomTest<AVX2_BLEND<int>>(config);
+	RandomTest<AVX2_BLEND<float>>(config);
+	RandomTest<AVX2_BLEND<double>>(config);
+	RandomTest<AVX2_MINMAX<int>>(config);
+	RandomTest<AVX2_MINMAX<float>>(config);
+	RandomTest<AVX2_MINMAX<double>>(config);
+	RandomTest<AVX2_PERMUTE::SHUFFLE_0123<int>>(config);
+	RandomTest<AVX2_PERMUTE::UNPACKLO<int>>(config);
+	RandomTest<AVX2_PERMUTE::UNPACKHI<int>>(config);
+	RandomTest<AVX2_PERMUTE::SWAP_LANES<int>>(config);
+	RandomTest<AVX2_PERMUTE::PERMUTEVAR<int>>(config);
+	RandomTest<AVX512<int>>(config);
+	RandomTest<AVX512<float>>(config);
+	RandomTest<AVX512<double>>(config);
+	RandomTest<AVX512_CMP<int>>(config);
+	RandomTest<AVX512_CMP<float>>(config);
+	RandomTest<AVX512_CMP<double>>(config);
+    RandomTest<AVX512_BITWISE<int>>(config);
+    RandomTest<AVX512_BITWISE<float>>(config);
+    RandomTest<AVX512_BITWISE<double>>(config);
+    RandomTest<AVX512_SHIFT<int>>(config);
+    RandomTest<AVX512_BLEND<int>>(config);
+    RandomTest<AVX512_BLEND<float>>(config);
+    RandomTest<AVX512_BLEND<double>>(config);
+    RandomTest<AVX512_PERMUTE<int>>(config);
+    RandomTest<AVX512_PERMUTE<float>>(config);
+    RandomTest<AVX512_PERMUTE<double>>(config);
+    RandomTest<AVX512_CMP<int>>(config);
+    RandomTest<AVX512_CMP<float>>(config);
+    RandomTest<AVX512_CMP<double>>(config);
+	RandomTest<AVX512_REDUCE<int>>(config);
+	RandomTest<AVX512_REDUCE<float>>(config);
+	RandomTest<AVX512_REDUCE<double>>(config);
+	RandomTest<AVX512_MASK<int>>(config);
+	RandomTest<AVX512_MASK<float>>(config);
+	RandomTest<AVX512_MASK<double>>(config);
+	RandomTest<AVX512_COMPRESS<int>>(config);
+	RandomTest<AVX512_COMPRESS<float>>(config);
+	RandomTest<AVX512_COMPRESS<double>>(config);
 #if 0
-	RandomTest<AVX512_CONVERT<int, float>>();
-	RandomTest<AVX512_CONVERT<int, double>>();
-	RandomTest<AVX512_CONVERT<float, int>>();
-	RandomTest<AVX512_CONVERT<double, int>>();
+	RandomTest<AVX512_CONVERT<int, float>>(config);
+	RandomTest<AVX512_CONVERT<int, double>>(config);
+	RandomTest<AVX512_CONVERT<float, int>>(config);
+	RandomTest<AVX512_CONVERT<double, int>>(config);
 #endif
 
-	RandomTest<AVX512_FMA<float>>();
-	RandomTest<AVX512_FMA<double>>();
+	RandomTest<AVX512_FMA<float>>(config);
+	RandomTest<AVX512_FMA<double>>(config);
 
 	// INT8 for vnni in reference
-	RandomTest<AVX512_VNNI<uint8_t, int8_t>>();
-	RandomTest<AVX512_VNNI<uint8_t, int8_t, true>>();
+	RandomTest<AVX512_VNNI<uint8_t, int8_t>>(config);
+	RandomTest<AVX512_VNNI<uint8_t, int8_t, true>>(config);
 	// INT16 for vnni in reference
-	RandomTest<AVX512_VNNI<int16_t, int16_t>>();
-	RandomTest<AVX512_VNNI<int16_t, int16_t, true>>();
+	RandomTest<AVX512_VNNI<int16_t, int16_t>>(config);
+	RandomTest<AVX512_VNNI<int16_t, int16_t, true>>(config);
 
 
 }

@@ -1,6 +1,7 @@
 template <typename T>
 struct AVX512_PERMUTE {
-    static constexpr const char* CLASS_NAME = "AVX512_PERMUTE";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "permute";
 
     static constexpr size_t LANES = 512 / (8 * sizeof(T));
     static constexpr size_t INPUT_SIZE = LANES;
@@ -63,7 +64,7 @@ struct AVX512_PERMUTE {
 
 	static constexpr auto make_ops() {
 	    return std::array{
-    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 permutevar", avx512_permutevar, sisd_permutevar }
+    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "permutevar", avx512_permutevar, sisd_permutevar }
     	};
 	}
 

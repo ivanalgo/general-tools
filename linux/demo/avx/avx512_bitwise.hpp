@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_BITWISE {
-    static constexpr const char* CLASS_NAME = "AVX512_BITWISE";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "bitwise";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -209,10 +210,10 @@ struct AVX512_BITWISE {
 
 	static constexpr auto make_ops() {
 	    return std::array{
-    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 and", avx512_and, sisd_and },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 or",  avx512_or,  sisd_or },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 xor", avx512_xor, sisd_xor },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 andnot", avx512_andnot, sisd_andnot },
+    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "and", avx512_and, sisd_and },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "or",  avx512_or,  sisd_or },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "xor", avx512_xor, sisd_xor },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "andnot", avx512_andnot, sisd_andnot },
     	};
 	}
 };

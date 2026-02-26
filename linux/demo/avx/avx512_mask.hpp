@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_MASK {
-    static constexpr const char* CLASS_NAME = "avx512_mask";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "mask";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -129,12 +130,12 @@ struct AVX512_MASK {
 	{
 		return std::array{
 			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-				"avx512 mask add (merge)",
+				"mask add (merge)",
 				avx_mask_add,
 				sisd_mask_add
 			},
 			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-				"avx512 maskz add (zero)",
+				"maskz add (zero)",
 				avx_maskz_add,
 				sisd_maskz_add
 			},

@@ -5,7 +5,8 @@
 
 template <typename T>
 struct AVX2_SHIFT {
-    static constexpr const char* CLASS_NAME = "AVX2_SHIFT";
+    static constexpr const char* CATEGORY = "avx2";
+    static constexpr const char* CLASS_TYPE = "shift";
 
     static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 

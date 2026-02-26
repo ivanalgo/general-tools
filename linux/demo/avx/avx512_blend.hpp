@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_BLEND {
-    static constexpr const char* CLASS_NAME = "AVX512_BLEND";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "blend";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -54,7 +55,7 @@ struct AVX512_BLEND {
 
 	static constexpr auto make_ops() {
     	return std::array{
-        	OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "avx512 blend", avx512_blend, sisd_blend }
+        	OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "blend", avx512_blend, sisd_blend }
     	};
 	}
 

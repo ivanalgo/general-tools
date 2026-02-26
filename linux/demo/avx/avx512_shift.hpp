@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_SHIFT {
-    static constexpr const char* CLASS_NAME = "AVX512_SHIFT";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "shift";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -77,9 +78,9 @@ struct AVX512_SHIFT {
 
 	static constexpr auto make_ops() {
     	return std::array{
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 sll", avx512_sll, sisd_sll },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 srl", avx512_srl, sisd_srl },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 sra", avx512_sra, sisd_sra },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", avx512_sll, sisd_sll },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", avx512_srl, sisd_srl },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", avx512_sra, sisd_sra },
     	};
 	}
 };

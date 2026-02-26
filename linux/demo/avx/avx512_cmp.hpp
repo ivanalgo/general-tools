@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_CMP {
-    static constexpr const char* CLASS_NAME = "AVX512_CMP";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "cmp";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -113,10 +114,10 @@ struct AVX512_CMP {
     {
         return std::array{
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "avx512 cmp gt", avx_gt, sisd_gt
+                "cmp_gt", avx_gt, sisd_gt
             },
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "avx512 cmp eq", avx_eq, sisd_eq
+                "cmp_eq", avx_eq, sisd_eq
             },
         };
     }

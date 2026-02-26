@@ -16,9 +16,10 @@ struct AVX2_CMP_BOOL_TYPE<double> {
 	using type = int64_t;
 };
 
-template <typename T>
+template<typename T>
 struct AVX2_CMP {
-    static constexpr const char* CLASS_NAME = "AVX2_CMP";
+    static constexpr const char* CATEGORY = "avx2";
+    static constexpr const char* CLASS_TYPE = "cmp";
 
     static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 

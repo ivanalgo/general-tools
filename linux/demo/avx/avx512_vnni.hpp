@@ -1,6 +1,7 @@
 template<typename A, typename B, bool SATURATE = false>
 struct AVX512_VNNI {
-    static constexpr const char* CLASS_NAME = "avx512_vnni";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "vnni";
 
     static constexpr size_t A_LANES = 512 / (8 * sizeof(A));
     static constexpr size_t GROUP_SIZE   = (sizeof(A) == 1 ? 4 : 2);
@@ -78,7 +79,7 @@ struct AVX512_VNNI {
     {
         return std::array{
             OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-                "avx512 vnni",
+                "vnni",
                 avx_vnni,
                 sisd_vnni
             }

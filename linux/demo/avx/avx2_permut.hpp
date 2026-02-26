@@ -1,12 +1,16 @@
-namespace AVX2_PERMUTE
+struct AVX2_PERMUTE
 {
+    static constexpr const char* CATEGORY = "avx2";
+    static constexpr const char* CLASS_TYPE = "permute";
+
     /* ============================================================
      * shuffle_epi32 (imm8 固化版本)
      * 每个 128bit lane 内独立 shuffle
      * ============================================================ */
     template <typename T>
     struct SHUFFLE_0123 {
-        static constexpr const char* CLASS_NAME = "AVX2_SHUFFLE_0123";
+        static constexpr const char* CATEGORY = "avx2";
+        static constexpr const char* CLASS_TYPE = "permute";
 
         static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 
@@ -53,7 +57,8 @@ namespace AVX2_PERMUTE
      * ============================================================ */
     template <typename T>
     struct UNPACKLO {
-        static constexpr const char* CLASS_NAME = "AVX2_UNPACKLO";
+        static constexpr const char* CATEGORY = "avx2";
+        static constexpr const char* CLASS_TYPE = "permute";
 
         static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 
@@ -100,7 +105,8 @@ namespace AVX2_PERMUTE
      * ============================================================ */
     template <typename T>
     struct UNPACKHI {
-        static constexpr const char* CLASS_NAME = "AVX2_UNPACKHI";
+        static constexpr const char* CATEGORY = "avx2";
+        static constexpr const char* CLASS_TYPE = "permute";
 
         static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 
@@ -147,7 +153,8 @@ namespace AVX2_PERMUTE
      * ============================================================ */
     template <typename T>
     struct SWAP_LANES {
-        static constexpr const char* CLASS_NAME = "AVX2_SWAP_LANES";
+        static constexpr const char* CATEGORY = "avx2";
+        static constexpr const char* CLASS_TYPE = "permute";
 
         static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 
@@ -188,7 +195,8 @@ namespace AVX2_PERMUTE
      * ============================================================ */
     template <typename T>
     struct PERMUTEVAR {
-        static constexpr const char* CLASS_NAME = "AVX2_PERMUTEVAR";
+        static constexpr const char* CATEGORY = "avx2";
+        static constexpr const char* CLASS_TYPE = "permute";
 
         static constexpr size_t INPUT_SIZE = 256 / (8 * sizeof(T));
 

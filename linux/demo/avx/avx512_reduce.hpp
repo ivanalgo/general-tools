@@ -1,6 +1,7 @@
-template <typename T>
+template<typename T>
 struct AVX512_REDUCE {
-    static constexpr const char* CLASS_NAME = "avx512_reduce";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "reduce";
 
     static constexpr size_t INPUT_SIZE = 512 / (8 * sizeof(T));
 
@@ -113,9 +114,9 @@ struct AVX512_REDUCE {
     static constexpr auto make_ops()
     {
         return std::array{
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "avx512 reduce sum", avx_sum, sisd_sum },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "avx512 reduce max", avx_max, sisd_max },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "avx512 reduce min", avx_min, sisd_min },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce sum", avx_sum, sisd_sum },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce max", avx_max, sisd_max },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce min", avx_min, sisd_min },
         };
     }
 };

@@ -1,6 +1,7 @@
 template <typename T>
 struct AVX512 {
-    static constexpr const char* CLASS_NAME = "avx512";
+    static constexpr const char* CATEGORY = "avx512";
+    static constexpr const char* CLASS_TYPE = "arithmetic";
 
     static constexpr int BIT_WIDTH = 512;
 
@@ -152,16 +153,16 @@ struct AVX512 {
     {
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
             return std::array{
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 add", avx_add, sisd_add },
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 sub", avx_sub, sisd_sub },
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 mul", avx_mul, sisd_mul },
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 div", avx_div, sisd_div },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "div", avx_div, sisd_div },
             };
         } else {
             return std::array{
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 add", avx_add, sisd_add },
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 sub", avx_sub, sisd_sub },
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "avx512 mul", avx_mul, sisd_mul },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "add", avx_add, sisd_add },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sub", avx_sub, sisd_sub },
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "mul", avx_mul, sisd_mul },
             };
         }
     }
