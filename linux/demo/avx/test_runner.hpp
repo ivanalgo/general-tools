@@ -61,27 +61,32 @@ std::string GetOpSignature(const char* op_name, std::index_sequence<Is...>) {
 }
 
 // ----------------------------------------------------------------------
-// Data Initialization with Boundary Values
+// Data Initialization
 // ----------------------------------------------------------------------
 
 template <typename T, size_t N>
 void RandomInit(T (&a)[N]) {
-    // Seed with time and random_device
     auto seed = static_cast<uint32_t>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count()
     ) ^ std::random_device{}();
-
     std::mt19937 rng(seed);
 
     if constexpr (std::is_floating_point_v<T>) {
         std::uniform_real_distribution<T> dist(static_cast<T>(-10.0), static_cast<T>(10.0));
-        
-        // Fill most with random values
-        for (size_t i = 0; i < N; ++i) {
-            a[i] = dist(rng);
-        }
+        for (size_t i = 0; i < N; ++i) a[i] = dist(rng);
+    } else if constexpr (std::is_integral_v<T>) {
+        std::uniform_int_distribution<T> dist(static_cast<T>(-100), static_cast<T>(100));
+        for (size_t i = 0; i < N; ++i) a[i] = dist(rng);
+    } else {
+        std::memset(a, 0, sizeof(a));
+    }
+}
 
-        // Inject special values if array is large enough
+template <typename T, size_t N>
+void BoundaryInit(T (&a)[N]) {
+    RandomInit(a); // Fill with random first
+
+    if constexpr (std::is_floating_point_v<T>) {
         if (N >= 4) {
             a[0] = static_cast<T>(0.0);
             a[1] = static_cast<T>(-0.0);
@@ -90,16 +95,9 @@ void RandomInit(T (&a)[N]) {
         }
         if (N >= 6) {
             a[4] = std::numeric_limits<T>::quiet_NaN();
-            a[5] = std::numeric_limits<T>::min(); // smallest positive normal
+            a[5] = std::numeric_limits<T>::min();
         }
     } else if constexpr (std::is_integral_v<T>) {
-        std::uniform_int_distribution<T> dist(static_cast<T>(-100), static_cast<T>(100));
-        
-        for (size_t i = 0; i < N; ++i) {
-            a[i] = dist(rng);
-        }
-
-        // Inject special values
         if (N >= 4) {
             a[0] = 0;
             a[1] = 1;
@@ -109,8 +107,24 @@ void RandomInit(T (&a)[N]) {
         if (N >= 5) {
             a[4] = std::numeric_limits<T>::min();
         }
+    }
+}
+
+template <typename T, size_t N>
+void NormalInit(T (&a)[N]) {
+    auto seed = static_cast<uint32_t>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count()
+    ) ^ std::random_device{}();
+    std::mt19937 rng(seed);
+
+    // Use normal distribution with mean=0 and stddev=50 for ints, 5.0 for floats
+    if constexpr (std::is_floating_point_v<T>) {
+        std::normal_distribution<T> dist(0.0, 5.0);
+        for (size_t i = 0; i < N; ++i) a[i] = dist(rng);
+    } else if constexpr (std::is_integral_v<T>) {
+        std::normal_distribution<double> dist(0.0, 50.0);
+        for (size_t i = 0; i < N; ++i) a[i] = static_cast<T>(dist(rng));
     } else {
-        // Fallback or error
         std::memset(a, 0, sizeof(a));
     }
 }
@@ -182,29 +196,41 @@ auto& AsCArray(std::array<T, N>& arr) {
 template <typename Class, typename = void>
 struct has_arg3_init : std::false_type {};
 template <typename Class>
-struct has_arg3_init<Class, std::void_t<decltype(Class::arg3_init(std::declval<typename Class::ARG3_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
+struct has_arg3_init<Class, std::void_t<decltype(Class::arg3_init(std::declval<typename Class::ARG3_TYPE(&)[Class::INPUT_SIZE]>(), std::declval<const TestConfig&>()))>> : std::true_type {};
 
 template <typename Class, typename = void>
 struct has_arg2_init : std::false_type {};
 template <typename Class>
-struct has_arg2_init<Class, std::void_t<decltype(Class::arg2_init(std::declval<typename Class::ARG2_TYPE(&)[Class::INPUT_SIZE]>()))>> : std::true_type {};
+struct has_arg2_init<Class, std::void_t<decltype(Class::arg2_init(std::declval<typename Class::ARG2_TYPE(&)[Class::INPUT_SIZE]>(), std::declval<const TestConfig&>()))>> : std::true_type {};
 
 template <typename Class, size_t I, typename T, size_t N>
-void InitArg(std::array<T, N>& arr) {
+void InitArg(std::array<T, N>& arr, const TestConfig& config) {
     auto& c_arr = AsCArray(arr);
+    
+    // Helper lambda to dispatch based on config
+    [[maybe_unused]] auto dispatch_init = [&](auto& arr_ref) {
+        if (config.init_mode == "boundary") {
+            BoundaryInit(arr_ref);
+        } else if (config.init_mode == "normal") {
+            NormalInit(arr_ref);
+        } else {
+            RandomInit(arr_ref);
+        }
+    };
+
     if constexpr (I == 0) {
-        RandomInit(c_arr);
+        dispatch_init(c_arr);
     } else if constexpr (I == 1) {
         if constexpr (has_arg2_init<Class>::value) {
-            Class::arg2_init(c_arr);
+            Class::arg2_init(c_arr, config);
         } else {
-            RandomInit(c_arr);
+            dispatch_init(c_arr);
         }
     } else if constexpr (I == 2) {
         if constexpr (has_arg3_init<Class>::value) {
-            Class::arg3_init(c_arr);
+            Class::arg3_init(c_arr, config);
         } else {
-            RandomInit(c_arr);
+            dispatch_init(c_arr);
         }
     }
 }
@@ -228,7 +254,7 @@ void RunTestImpl(const Op& op, const TestConfig& config, std::index_sequence<Is.
 
     // 2. Prepare Inputs
     std::tuple<std::array<typename ArgType<Class, Is>::type, GetArgSize<Class, Is>()>...> inputs;
-    (InitArg<Class, Is>(std::get<Is>(inputs)), ...);
+    (InitArg<Class, Is>(std::get<Is>(inputs), config), ...);
 
     // 3. Prepare Outputs
     typename Class::OUTPUT_TYPE avx_out[Class::OUTPUT_SIZE];

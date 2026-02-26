@@ -18,7 +18,7 @@ struct AVX2_BLEND {
     using OUTPUT_TYPE = T;
     static constexpr size_t OUTPUT_SIZE = INPUT_SIZE;
 
-	static void arg3_init(MASK_TYPE (&a)[INPUT_SIZE]) {
+	static void arg3_init(MASK_TYPE (&a)[INPUT_SIZE], const TestConfig& config) {
 		// 用时间和 random_device 混合，避免退化
 		auto seed = static_cast<uint32_t>(
 			std::chrono::high_resolution_clock::now()
@@ -27,11 +27,22 @@ struct AVX2_BLEND {
 		) ^ std::random_device{}();
 
 		std::mt19937 rng(seed);
-		std::uniform_int_distribution<int> dist(0, 1);
-
-		for (size_t i = 0; i < INPUT_SIZE; ++i) {
-			a[i] = dist(rng) ? -1 : 0;
-		}
+        // For blend mask, we always want 0 or -1 regardless of mode
+        // But maybe for boundary we want all 0 or all -1?
+        // Let's stick to random 0/-1 for now as it exercises blend best.
+        // Or we could make 'boundary' mode produce alternating 0/-1 or block of 0s then block of -1s.
+        
+        if (config.init_mode == "boundary") {
+            // Alternating
+            for (size_t i = 0; i < INPUT_SIZE; ++i) {
+                a[i] = (i % 2 == 0) ? -1 : 0;
+            }
+        } else {
+            std::uniform_int_distribution<int> dist(0, 1);
+            for (size_t i = 0; i < INPUT_SIZE; ++i) {
+                a[i] = dist(rng) ? -1 : 0;
+            }
+        }
 	}
 
 	static void avx_blend(const T* a,

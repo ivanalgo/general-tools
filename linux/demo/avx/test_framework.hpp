@@ -16,6 +16,7 @@ struct TestConfig {
     std::string class_filter;    // match for CLASS_TYPE (e.g. "cmp", "bitwise")
     std::string op_filter;       // match for op name
     std::string type_filter;     // partial match for type signature
+    std::string init_mode = "random"; // "random", "boundary", "normal"
     bool help_mode = false;      // If true, collect info and print help
     bool verbose = false;        // Print detailed output even on success
 };
@@ -98,6 +99,8 @@ public:
         std::cout << "\nGeneral Options:\n";
         std::cout << "  --op=<name>      Filter by operation name (partial match)\n";
         std::cout << "  --type=<sig>     Filter by type signature (partial match)\n";
+        std::cout << "  --init=<mode>    Data initialization mode (default: random)\n";
+        std::cout << "                   Modes: random, boundary, normal\n";
         std::cout << "  --help           Show this help message\n";
     }
 

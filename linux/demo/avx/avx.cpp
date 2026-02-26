@@ -81,6 +81,8 @@ int main(int argc, char** argv)
             config.op_filter = arg.substr(11);
         } else if (arg.find("--type=") == 0) {
             config.type_filter = arg.substr(7);
+        } else if (arg.find("--init=") == 0) {
+            config.init_mode = arg.substr(7);
         } else if (arg == "--verbose") {
             config.verbose = true;
         }

@@ -15,11 +15,16 @@ struct AVX512_PERMUTE {
     using OUTPUT_TYPE = T;
     static constexpr size_t OUTPUT_SIZE = LANES;
 
-	static void arg2_init(ARG2_TYPE (&idx)[INPUT_SIZE]) {
+	static void arg2_init(ARG2_TYPE (&idx)[INPUT_SIZE], const TestConfig& config) {
 
     	// 初始化顺序 0~INPUT_SIZE-1
     	for (size_t i = 0; i < INPUT_SIZE; ++i)
         	idx[i] = static_cast<ARG2_TYPE>(i);
+
+        if (config.init_mode == "boundary") {
+            // No shuffle for boundary, just 0, 1, 2...
+            return;
+        }
 
     	// 用时间和 random_device 混合生成种子
 		auto seed = static_cast<uint32_t>(
