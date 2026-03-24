@@ -79,8 +79,8 @@ struct AVX512_MATH {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "rcp14", avx512_rcp14, sisd_rcp14 },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "rsqrt14", avx512_rsqrt14, sisd_rsqrt14 }
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "rcp14", "out[i] = 1.0 / a[i] (approx)", avx512_rcp14, sisd_rcp14 },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "rsqrt14", "out[i] = 1.0 / sqrt(a[i]) (approx)", avx512_rsqrt14, sisd_rsqrt14 }
         };
     }
 };

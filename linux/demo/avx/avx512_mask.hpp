@@ -131,11 +131,13 @@ struct AVX512_MASK {
 		return std::array{
 			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
 				"mask add (merge)",
+				"out = blend(default, a + b, k)",
 				avx_mask_add,
 				sisd_mask_add
 			},
 			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
 				"maskz add (zero)",
+				"out = zero | (a + b) & k",
 				avx_maskz_add,
 				sisd_maskz_add
 			},

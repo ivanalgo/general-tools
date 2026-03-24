@@ -19,28 +19,7 @@
 #include "test_framework.hpp"
 #include "test_runner.hpp"
 
-template <typename ARG1_TYPE, typename OUT_TYPE>
-struct OpEntry1 {
-    const char* name;
 
-    void (*avx)(const ARG1_TYPE*, OUT_TYPE*);
-    void (*sisd)(const ARG1_TYPE*, OUT_TYPE*);
-};
-
-template <typename ARG1_TYPE, typename ARG2_TYPE, typename OUT_TYPE>
-struct OpEntry2 {
-    const char* name;
-
-    void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
-    void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
-};
-
-template <typename ARG1_TYPE, typename ARG2_TYPE, typename ARG3_TYPE, typename OUT_TYPE>
-struct OpEntry3 {
-	const char* name;
-	void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
-	void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
-};
 
 #include "avx1.hpp"
 #include "avx2.hpp"
@@ -93,6 +72,8 @@ int main(int argc, char** argv)
             config.init_mode = arg.substr(7);
         } else if (arg == "--verbose") {
             config.verbose = true;
+        } else if (arg == "--show-pseudocode") {
+            config.show_pseudocode = true;
         }
     }
 

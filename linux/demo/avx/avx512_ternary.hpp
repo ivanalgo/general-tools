@@ -146,8 +146,8 @@ struct AVX512_TERNARY {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "xor3 (0x96)", avx512_xor3, sisd_xor3 },
-            OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "or3 (0xFE)", avx512_select, sisd_or3 }
+            OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "xor3 (0x96)", "out[i] = a[i] ^ b[i] ^ c[i]", avx512_xor3, sisd_xor3 },
+            OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "or3 (0xFE)", "out[i] = a[i] | b[i] | c[i]", avx512_select, sisd_or3 }
         };
     }
 };

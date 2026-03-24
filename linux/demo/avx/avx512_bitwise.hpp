@@ -210,10 +210,10 @@ struct AVX512_BITWISE {
 
 	static constexpr auto make_ops() {
 	    return std::array{
-    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "and", avx512_and, sisd_and },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "or",  avx512_or,  sisd_or },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "xor", avx512_xor, sisd_xor },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "andnot", avx512_andnot, sisd_andnot },
+    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "and", "out[i] = a[i] & b[i]", avx512_and, sisd_and },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "or",  "out[i] = a[i] | b[i]", avx512_or,  sisd_or },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "xor", "out[i] = a[i] ^ b[i]", avx512_xor, sisd_xor },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "andnot", "out[i] = (~a[i]) & b[i]", avx512_andnot, sisd_andnot },
     	};
 	}
 };

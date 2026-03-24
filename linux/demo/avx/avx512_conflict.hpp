@@ -75,8 +75,8 @@ struct AVX512_CONFLICT {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "conflict", avx512_conflict, sisd_conflict },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "lzcnt", avx512_lzcnt, sisd_lzcnt }
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "conflict", "out[i] = mask of previous equal elements", avx512_conflict, sisd_conflict },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "lzcnt", "out[i] = number of leading zero bits", avx512_lzcnt, sisd_lzcnt }
         };
     }
 };

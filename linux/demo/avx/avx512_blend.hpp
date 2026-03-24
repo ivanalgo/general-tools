@@ -55,7 +55,7 @@ struct AVX512_BLEND {
 
 	static constexpr auto make_ops() {
     	return std::array{
-        	OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "blend", avx512_blend, sisd_blend }
+        	OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "blend", "out[i] = (mask bit i set) ? b[i] : a[i]", avx512_blend, sisd_blend }
     	};
 	}
 

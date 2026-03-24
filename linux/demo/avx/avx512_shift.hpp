@@ -78,9 +78,9 @@ struct AVX512_SHIFT {
 
 	static constexpr auto make_ops() {
     	return std::array{
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", avx512_sll, sisd_sll },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", avx512_srl, sisd_srl },
-        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", avx512_sra, sisd_sra },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", "out[i] = a[i] << b[i]", avx512_sll, sisd_sll },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", "out[i] = a[i] >> b[i] (logical)", avx512_srl, sisd_srl },
+        	OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", "out[i] = a[i] >> b[i] (arithmetic)", avx512_sra, sisd_sra },
     	};
 	}
 };

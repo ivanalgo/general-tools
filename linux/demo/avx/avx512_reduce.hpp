@@ -114,9 +114,9 @@ struct AVX512_REDUCE {
     static constexpr auto make_ops()
     {
         return std::array{
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce sum", avx_sum, sisd_sum },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce max", avx_max, sisd_max },
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce min", avx_min, sisd_min },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce sum", "out[0] = sum all lanes", avx_sum, sisd_sum },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce max", "out[0] = max all lanes", avx_max, sisd_max },
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "reduce min", "out[0] = min all lanes", avx_min, sisd_min },
         };
     }
 };

@@ -102,7 +102,7 @@ struct AVX2_PACK {
     
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "packss", avx2_packss, sisd_packss }
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "packss", "pack signed with saturation: out = saturate(a) + saturate(b)", avx2_packss, sisd_packss }
         };
     }
 };

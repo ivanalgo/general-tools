@@ -223,10 +223,10 @@ struct AVX2_BITWISE {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "and",	   avx_and,	   sisd_and	   },
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "or",	   avx_or,	   sisd_or	   },
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "xor",	   avx_xor,	   sisd_xor	   },
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "andnot", avx_andnot, sisd_andnot },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "and",    "out[i] = a[i] & b[i]",    avx_and,    sisd_and    },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "or",     "out[i] = a[i] | b[i]",    avx_or,     sisd_or     },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "xor",    "out[i] = a[i] ^ b[i]",    avx_xor,    sisd_xor    },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "andnot", "out[i] = (~a[i]) & b[i]", avx_andnot, sisd_andnot },
 		};
 	}
 };

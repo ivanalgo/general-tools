@@ -114,10 +114,10 @@ struct AVX512_CMP {
     {
         return std::array{
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "cmp_gt", avx_gt, sisd_gt
+                "cmp_gt", "mask[i] = (a[i] > b[i])", avx_gt, sisd_gt
             },
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "cmp_eq", avx_eq, sisd_eq
+                "cmp_eq", "mask[i] = (a[i] == b[i])", avx_eq, sisd_eq
             },
         };
     }

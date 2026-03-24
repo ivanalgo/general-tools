@@ -77,7 +77,7 @@ struct AVX2_GATHER {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "gather", avx2_gather, sisd_gather }
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "gather", "out[i] = mem[idx[i]]", avx2_gather, sisd_gather }
         };
     }
 };

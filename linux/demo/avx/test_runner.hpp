@@ -61,6 +61,36 @@ std::string GetOpSignature(const char* op_name, std::index_sequence<Is...>) {
 }
 
 // ----------------------------------------------------------------------
+// Operation Entry Types
+// ----------------------------------------------------------------------
+
+template <typename ARG1_TYPE, typename OUT_TYPE>
+struct OpEntry1 {
+    const char* name;
+    const char* pseudocode;
+
+    void (*avx)(const ARG1_TYPE*, OUT_TYPE*);
+    void (*sisd)(const ARG1_TYPE*, OUT_TYPE*);
+};
+
+template <typename ARG1_TYPE, typename ARG2_TYPE, typename OUT_TYPE>
+struct OpEntry2 {
+    const char* name;
+    const char* pseudocode;
+
+    void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
+    void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, OUT_TYPE*);
+};
+
+template <typename ARG1_TYPE, typename ARG2_TYPE, typename ARG3_TYPE, typename OUT_TYPE>
+struct OpEntry3 {
+	const char* name;
+	const char* pseudocode;
+	void (*avx)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
+	void (*sisd)(const ARG1_TYPE*, const ARG2_TYPE*, const ARG3_TYPE*, OUT_TYPE*);
+};
+
+// ----------------------------------------------------------------------
 // Data Initialization
 // ----------------------------------------------------------------------
 
@@ -351,6 +381,12 @@ void RunTestImpl(const Op& op, const TestConfig& config, std::index_sequence<Is.
     if (!pass) {
         std::cout << Color::Red << "[FAIL] " << Color::Reset 
                   << category << ":" << class_type << ":" << op_name << type_sig << "\n";
+
+        // Print pseudocode if requested
+        if (config.show_pseudocode && op.pseudocode) {
+            std::cout << Color::Cyan << "  Pseudocode: " << Color::Reset << "\n";
+            std::cout << "    " << op.pseudocode << "\n";
+        }
         
         print_debug_info("  result = "); // Show actual result (AVX)
         DebugAligned("  expected = ", sisd_out, col_width); // Show expected (SISD) - might need alignment fix too but let's stick to simple for now
@@ -360,6 +396,12 @@ void RunTestImpl(const Op& op, const TestConfig& config, std::index_sequence<Is.
     } else {
         std::cout << Color::Green << "[PASS] " << Color::Reset 
                   << category << ":" << class_type << ":" << op_name << type_sig << "\n";
+
+        // Print pseudocode if requested
+        if (config.show_pseudocode && op.pseudocode) {
+            std::cout << Color::Cyan << "  Pseudocode: " << Color::Reset << "\n";
+            std::cout << "    " << op.pseudocode << "\n";
+        }
 
         print_debug_info("  result = ");
     }

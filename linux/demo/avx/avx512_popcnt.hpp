@@ -41,7 +41,7 @@ struct AVX512_POPCNT {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "popcnt", avx512_popcnt, sisd_popcnt }
+            OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{ "popcnt", "out[i] = __builtin_popcount(a[i])", avx512_popcnt, sisd_popcnt }
         };
     }
 };

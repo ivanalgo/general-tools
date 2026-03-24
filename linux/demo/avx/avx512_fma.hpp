@@ -65,7 +65,7 @@ struct AVX512_FMA {
     {
         return std::array{
             OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-                "fma",
+                "fma", "out[i] = a[i] * b[i] + c[i]",
                 avx_fma,
                 sisd_fma
             }

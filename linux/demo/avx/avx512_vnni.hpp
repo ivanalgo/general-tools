@@ -80,6 +80,7 @@ struct AVX512_VNNI {
         return std::array{
             OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
                 "vnni",
+                "out[i] += a[i] * b[i] (dot product accumulate)",
                 avx_vnni,
                 sisd_vnni
             }

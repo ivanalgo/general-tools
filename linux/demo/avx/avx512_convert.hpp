@@ -86,7 +86,7 @@ struct AVX512_CONVERT {
     {
         return std::array{
             OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{
-                "convert",
+                "convert", "out[i] = (DST)a[i]",
                 avx_convert,
                 sisd_convert
             }

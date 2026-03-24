@@ -72,7 +72,7 @@ struct AVX512_COMPRESS {
 	{
 		return std::array{
 			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-				"compress",
+				"compress", "out[0..] = { a[i] where mask[i] is set",
 				avx_compress,
 				sisd_compress
 			}

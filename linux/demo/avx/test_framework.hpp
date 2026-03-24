@@ -19,6 +19,7 @@ struct TestConfig {
     std::string init_mode = "random"; // "random", "boundary", "normal"
     bool help_mode = false;      // If true, collect info and print help
     bool verbose = false;        // Print detailed output even on success
+    bool show_pseudocode = false; // Show pseudocode explanation for each operation
 };
 
 // Base interface for a test case
@@ -101,6 +102,7 @@ public:
         std::cout << "  --type=<sig>     Filter by type signature (partial match)\n";
         std::cout << "  --init=<mode>    Data initialization mode (default: random)\n";
         std::cout << "                   Modes: random, boundary, normal\n";
+        std::cout << "  --show-pseudocode  Show pseudocode explanation for each operation\n";
         std::cout << "  --help           Show this help message\n";
     }
 

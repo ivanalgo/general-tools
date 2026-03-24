@@ -106,10 +106,10 @@ struct AVX2_MINMAX {
     {
         return std::array{
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "max", avx_max, sisd_max
+                "max", "out[i] = max(a[i], b[i])", avx_max, sisd_max
             },
             OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                "min", avx_min, sisd_min
+                "min", "out[i] = min(a[i], b[i])", avx_min, sisd_min
             },
         };
     }

@@ -154,8 +154,8 @@ struct AVX512_SCATTER_GATHER {
 
     static constexpr auto make_ops() {
         return std::array{
-            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "gather", avx512_gather, sisd_gather },
-            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "scatter", avx512_scatter, sisd_scatter }
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "gather", "out[i] = base[index[i]]", avx512_gather, sisd_gather },
+            OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "scatter", "out[i] = gathered from scattered store", avx512_scatter, sisd_scatter }
         };
     }
 };

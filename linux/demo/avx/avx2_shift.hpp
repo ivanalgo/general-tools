@@ -92,9 +92,9 @@ struct AVX2_SHIFT {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", avx_sll, sisd_sll },
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", avx_srl, sisd_srl },
-			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", avx_sra, sisd_sra },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sll", "out[i] = a[i] << b[i]", avx_sll, sisd_sll },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "srl", "out[i] = (uint32_t)a[i] >> b[i]", avx_srl, sisd_srl },
+			OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "sra", "out[i] = a[i] >> b[i] (arithmetic)", avx_sra, sisd_sra },
 		};
 	}
 };

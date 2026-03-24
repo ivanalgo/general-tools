@@ -69,7 +69,7 @@ struct AVX512_PERMUTE {
 
 	static constexpr auto make_ops() {
 	    return std::array{
-    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "permutevar", avx512_permutevar, sisd_permutevar }
+    	    OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "permutevar", "out[i] = a[index[i]]", avx512_permutevar, sisd_permutevar }
     	};
 	}
 

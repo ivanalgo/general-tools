@@ -45,7 +45,7 @@ struct AVX2_PERMUTE
         {
             return std::array{
                 OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{
-                    "shuffle_0123", avx, sisd
+                    "shuffle_0123", "Reverse order in each 128b lane: out[lane] = {a[3], a[2], a[1], a[0]}", avx, sisd
                 }
             };
         }
@@ -94,7 +94,7 @@ struct AVX2_PERMUTE
         {
             return std::array{
                 OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                    "unpacklo", avx, sisd
+                    "unpacklo", "Interleave lower half: out[i*2] = a[i], out[i*2+1] = b[i]", avx, sisd
                 }
             };
         }
@@ -142,7 +142,7 @@ struct AVX2_PERMUTE
         {
             return std::array{
                 OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                    "unpackhi", avx, sisd
+                    "unpackhi", "Interleave upper half: out[i*2] = a[i+2], out[i*2+1] = b[i+2]", avx, sisd
                 }
             };
         }
@@ -184,7 +184,7 @@ struct AVX2_PERMUTE
         {
             return std::array{
                 OpEntry1<ARG1_TYPE, OUTPUT_TYPE>{
-                    "swap_lanes", avx, sisd
+                    "swap_lanes", "Swap the two 128-bit lanes: out[0-3] = a[4-7], out[4-7] = a[0-3]", avx, sisd
                 }
             };
         }
@@ -227,7 +227,7 @@ struct AVX2_PERMUTE
         {
             return std::array{
                 OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{
-                    "permutevar", avx, sisd
+                    "permutevar", "out[i] = a[idx[i]]", avx, sisd
                 }
             };
         }

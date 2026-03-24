@@ -53,7 +53,7 @@ struct AVX2_SHUFFLE {
     static constexpr auto make_ops() {
         if constexpr (std::is_integral_v<T>) {
              return std::array{
-                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "shuffle_epi8", avx2_shuffle, sisd_shuffle }
+                OpEntry2<ARG1_TYPE, ARG2_TYPE, OUTPUT_TYPE>{ "shuffle_epi8", "out_byte[i] = mask[i] & 0x80 ? 0 : a_byte[(mask[i]&0x0F)+lane_off]", avx2_shuffle, sisd_shuffle }
             };
         } else {
              // Not defining for float/double as shuffle_epi8 is integer domain,

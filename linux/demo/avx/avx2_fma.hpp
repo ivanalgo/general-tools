@@ -153,10 +153,10 @@ struct AVX2_FMA {
 	static constexpr auto make_ops()
 	{
 		return std::array{
-			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmadd",  avx_fmadd,  sisd_fmadd  },
-			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmsub",  avx_fmsub,  sisd_fmsub  },
-			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmadd", avx_fnmadd, sisd_fnmadd },
-			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmsub", avx_fnmsub, sisd_fnmsub },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmadd",  "out[i] = a[i] * b[i] + c[i]",  avx_fmadd,  sisd_fmadd  },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fmsub",  "out[i] = a[i] * b[i] - c[i]",  avx_fmsub,  sisd_fmsub  },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmadd", "out[i] = -a[i] * b[i] + c[i]", avx_fnmadd, sisd_fnmadd },
+			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{ "fnmsub", "out[i] = -a[i] * b[i] - c[i]", avx_fnmsub, sisd_fnmsub },
 		};
 	}
 };

@@ -109,7 +109,7 @@ struct AVX2_BLEND {
 	{
 		return std::array{
 			OpEntry3<ARG1_TYPE, ARG2_TYPE, ARG3_TYPE, OUTPUT_TYPE>{
-				"blend", avx_blend, sisd_blend
+				"blend", "out[i] = mask[i] ? b[i] : a[i]", avx_blend, sisd_blend
 			},
 		};
 	}
