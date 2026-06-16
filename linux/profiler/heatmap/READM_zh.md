@@ -321,13 +321,103 @@ summary 会把所有 page 聚合成：
 
 适合人工阅读，包含 summary 和 top pages/processes。
 
+`report-mode=both` 时，典型文本输出大致如下：
+
+```text
+backend=pebs pages=15278 dropped_pages=0 dropped_samples=0 lost_samples=0 report_mode=both summary_metric=pages heat_policy=absolute addr_mode=auto output=text cooling=exp interval_ms=500.00
+phys_translate_attempts=49582 phys_translate_failures=22114
+summary policy=absolute metric=pages total_pages=15278 total_bytes=62578688 total_heat=1468.80 total_samples=49582
+summary thresholds hot>=20.00 cold<3.00
+class    pages        bytes              metric_value     ratio
+hot      7            28672              7.00             0.05%
+warm     48           196608             48.00            0.31%
+cold     15223        62353408           15223.00         99.64%
+
+rank   kind      page_base          state   heat    avg_weight owner_pid owner_tid owner_samples last_ip
+1      virtual   0xffffa55441abb000 hot     194.00  8.61       4025963   4025963   194           0xffffffffc0bb0e2f
+2      virtual   0xffffffffc0bcc000 hot      80.00  7.20       4025963   4025963    80           0xffffffffc0bb0b73
+3      physical  0x000000026a369000 hot      20.40  8.49       4069528   4069528   176           0x0000561524408755
+
+rank   pid        heat       pages      samples    hot_pages  warm_pages cold_pages
+1      4025963    335.02     16         377        5          3          8
+2      4069528     81.44     42         554        1         10         31
+```
+
+在 `report-mode=both` 下，文本输出通常分成三块：
+
+1. **运行元信息与整体 summary**
+2. **page 级 detail 排名**
+3. **process 级汇总排名**
+
+第一块里建议重点关注这些字段：
+
+- `backend`：实际使用的采样后端，通常是 `pebs` 或 `ibs`
+- `pages`：最终报告中跟踪到的 page 条目总数
+- `dropped_pages`：由于 page 跟踪表达到上限而无法插入的 page 数量
+- `dropped_samples`：因为无法得到有效 page key 而被丢弃的 sample 数量
+- `lost_samples`：内核/perf ring 路径里丢失的 sample 数量
+- `report_mode`：`detail`、`summary` 或 `both`
+- `summary_metric`：summary 表中 `ratio` 的计算口径
+- `heat_policy`：`absolute` 或 `percentile`
+- `addr_mode`：`virtual`、`physical` 或 `auto`
+- `cooling`：`none`、`step` 或 `exp`
+- `interval_ms`：cooling 周期，单位毫秒
+- `phys_translate_attempts`：尝试获得 physical page 的次数，包括 sample 直接给出 physical address，以及通过 pagemap 回退翻译的情况
+- `phys_translate_failures`：上述 physical-address 尝试失败的次数；失败后会回退成 virtual 或直接丢弃
+- `total_pages` / `total_bytes` / `total_heat` / `total_samples`：本次运行所有跟踪 page 的总体统计
+- `summary thresholds hot>=... cold<...`：`absolute` 模式下实际使用的分类阈值
+- `class`：`hot`、`warm`、`cold` 三种类别
+- `metric_value`：用于计算 `ratio` 的值；它的含义取决于 `summary_metric`，可能是 pages、heat 或 samples
+- `ratio`：在当前 `summary_metric` 口径下，该类别占总量的百分比
+
+第二块 page 级 detail 里，关键字段含义如下：
+
+- `rank`：按 heat 从高到低排序后的名次
+- `kind`：当前 page key 是 `virtual` 还是 `physical`
+- `page_base`：按页对齐后的起始地址
+- `state`：按当前 heat policy 计算出的 page 分类结果
+- `heat`：这个 page 当前的 heat 分数，已经包含 cooling 的影响
+- `avg_weight`：落到该 page 上的 sample 的平均 PMU weight；如果是 `0`，通常表示 PMU 没有提供有意义的 weight
+- `owner_pid` / `owner_tid`：对该 page 贡献 sample 最多的进程/线程
+- `owner_samples`：这个主导 owner 在该 page 上贡献的 sample 数量
+- `last_ip`：最近一次命中该 page 的 sample 对应的指令地址
+
+为了让 text 输出更紧凑，text 模式的 page 明细表没有单独展示 `samples` 列；如果你需要逐页查看总 sample 数，建议使用 JSON 或 CSV 输出。
+
+第三块 process 汇总里，关键字段含义如下：
+
+- `pid`：按累计 heat 排名的进程 ID
+- `heat`：该进程在 summary 视角下累计到的总 heat
+- `pages`：归属到该进程的 page 数量
+- `samples`：归属到该进程的 sample 数量
+- `hot_pages` / `warm_pages` / `cold_pages`：该进程名下 page 在三种分类中的数量
+
 ### JSON
 
 结构化输出，方便脚本或后处理使用。
 
+JSON 和 text 模式承载的是同一批信息，只是改成了机器更容易处理的对象结构：
+
+- 顶层运行元信息，例如 `backend`、`pages`、`report_mode`、`heat_policy`、`addr_mode`、`cooling`
+- `summary` 对象，包含总体统计和 hot/warm/cold 三类统计
+- `results` 数组，对应 page 级明细
+- `process_results` 数组，对应 process 级汇总
+
+相比 text 模式，JSON 的每条 page 明细里还包含 `samples` 字段，表示这个 page 累积到的总 sample 数。
+
 ### CSV
 
 紧凑表格格式，适合导入表格工具或管道处理。
+
+CSV 在逻辑上与 text 模式一致，通常依次包含：
+
+- 一行运行元信息
+- 一行可选的 physical-address 翻译统计
+- summary 表
+- page 级明细表
+- process 级汇总表
+
+相比 text 模式，CSV 的 page 明细表也额外包含 `samples` 列。
 
 ## 后端工作原理
 

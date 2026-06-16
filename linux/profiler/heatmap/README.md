@@ -321,13 +321,103 @@ Example summary-oriented run:
 
 Human-readable summary and top pages/processes.
 
+Typical `report-mode=both` text output looks like this:
+
+```text
+backend=pebs pages=15278 dropped_pages=0 dropped_samples=0 lost_samples=0 report_mode=both summary_metric=pages heat_policy=absolute addr_mode=auto output=text cooling=exp interval_ms=500.00
+phys_translate_attempts=49582 phys_translate_failures=22114
+summary policy=absolute metric=pages total_pages=15278 total_bytes=62578688 total_heat=1468.80 total_samples=49582
+summary thresholds hot>=20.00 cold<3.00
+class    pages        bytes              metric_value     ratio
+hot      7            28672              7.00             0.05%
+warm     48           196608             48.00            0.31%
+cold     15223        62353408           15223.00         99.64%
+
+rank   kind      page_base          state   heat    avg_weight owner_pid owner_tid owner_samples last_ip
+1      virtual   0xffffa55441abb000 hot     194.00  8.61       4025963   4025963   194           0xffffffffc0bb0e2f
+2      virtual   0xffffffffc0bcc000 hot      80.00  7.20       4025963   4025963    80           0xffffffffc0bb0b73
+3      physical  0x000000026a369000 hot      20.40  8.49       4069528   4069528   176           0x0000561524408755
+
+rank   pid        heat       pages      samples    hot_pages  warm_pages cold_pages
+1      4025963    335.02     16         377        5          3          8
+2      4069528     81.44     42         554        1         10         31
+```
+
+The text report has three sections when `report-mode=both`:
+
+1. **Run metadata and overall summary**
+2. **Top page results**
+3. **Top process summary**
+
+Important fields in the metadata and summary section:
+
+- `backend`: selected sampling backend, typically `pebs` or `ibs`
+- `pages`: total tracked page entries in the final report
+- `dropped_pages`: pages that could not be inserted because the tracking table hit its configured limit
+- `dropped_samples`: samples discarded because no valid page key could be produced
+- `lost_samples`: perf samples lost by the kernel/perf ring path
+- `report_mode`: `detail`, `summary`, or `both`
+- `summary_metric`: the basis used for the `ratio` column in the summary table
+- `heat_policy`: `absolute` or `percentile`
+- `addr_mode`: `virtual`, `physical`, or `auto`
+- `cooling`: `none`, `step`, or `exp`
+- `interval_ms`: cooling interval in milliseconds
+- `phys_translate_attempts`: number of times the profiler tried to obtain a physical page, either directly from the sample or by pagemap fallback
+- `phys_translate_failures`: number of those physical-address attempts that failed and had to fall back or be dropped
+- `total_pages` / `total_bytes` / `total_heat` / `total_samples`: totals across all tracked pages
+- `summary thresholds hot>=... cold<...`: shown in `absolute` mode to describe the classification rule actually used
+- `class`: one of `hot`, `warm`, or `cold`
+- `metric_value`: the value used to compute `ratio`; it means pages, heat, or samples depending on `summary_metric`
+- `ratio`: percentage contribution of each class under the selected `summary_metric`
+
+Important fields in the top page results section:
+
+- `rank`: page order after sorting by descending heat
+- `kind`: whether the page key is `virtual` or `physical`
+- `page_base`: base address of the page after page alignment
+- `state`: page class after applying the selected heat policy
+- `heat`: current heat score after cooling has been applied over time
+- `avg_weight`: average PMU weight for samples mapped to this page; `0` means the PMU did not provide useful weight data for those samples
+- `owner_pid` / `owner_tid`: the process/thread that contributed the most samples to this page
+- `owner_samples`: number of samples contributed by that dominant owner
+- `last_ip`: instruction pointer of the most recent sample mapped to the page
+
+Text mode keeps the page table compact, so it does not show a separate `samples` column there. If you need per-page `samples` explicitly, use JSON or CSV output.
+
+Important fields in the top process summary section:
+
+- `pid`: process ID ranked by accumulated heat
+- `heat`: total heat summed from pages owned by that process in the summary view
+- `pages`: number of tracked pages attributed to that process
+- `samples`: total samples attributed to that process
+- `hot_pages` / `warm_pages` / `cold_pages`: page counts by class for that process
+
 ### JSON
 
 Structured output suitable for scripting or post-processing.
 
+JSON contains the same information as text mode, but exposes it as machine-readable objects:
+
+- top-level run metadata such as `backend`, `pages`, `report_mode`, `heat_policy`, `addr_mode`, `cooling`
+- a `summary` object with total and class-specific counters
+- a `results` array for page-level detail entries
+- a `process_results` array for process-level summary entries
+
+Compared with text mode, each page entry in JSON also includes `samples`, which is the total sample count accumulated on that page.
+
 ### CSV
 
 Compact tabular output for spreadsheet or pipeline use.
+
+CSV follows the same logical structure as text mode:
+
+- one metadata line
+- optional physical-translation statistics line
+- summary rows
+- a page detail table
+- a process summary table
+
+Compared with text mode, the CSV page detail table also includes a `samples` column.
 
 ## Backend principles
 
