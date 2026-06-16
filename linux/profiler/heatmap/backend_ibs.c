@@ -37,6 +37,19 @@ static int ibs_prepare_attr(const struct profiler_options *options,
     }
 
     memset(attr, 0, sizeof(*attr));
+    /*
+     * Same perf_event_attr structure as PEBS, but targeting AMD IBS op PMU.
+     * The meaning of the common fields is the same:
+     * - sample_period controls the interrupt/sample cadence.
+     * - disabled=1 delays activation until the session is fully prepared.
+     * - inherit=0 keeps target selection explicit instead of inheriting to
+     *   future child tasks.
+     * - exclude_guest/exclude_hv ignore guest/hypervisor execution.
+     * - exclude_kernel is enabled only for --user-only.
+     * - precise_ip=2 asks perf for a more precise instruction pointer.
+     * - sample_id_all and wakeup_events help produce uniform records and make
+     *   ring draining responsive.
+     */
     attr->size = sizeof(*attr);
     attr->type = pmu_type;
     attr->sample_period = options->sample_period;
@@ -49,6 +62,11 @@ static int ibs_prepare_attr(const struct profiler_options *options,
     attr->precise_ip = 2;
     attr->sample_id_all = 1;
     attr->wakeup_events = 1;
+    /*
+     * Request the same logical sample fields as PEBS so the rest of the
+     * profiler can treat IBS and PEBS samples with a shared parsing/reporting
+     * path.
+     */
     attr->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
                         PERF_SAMPLE_ADDR | PERF_SAMPLE_CPU |
                         PERF_SAMPLE_WEIGHT | PERF_SAMPLE_DATA_SRC;
@@ -56,6 +74,11 @@ static int ibs_prepare_attr(const struct profiler_options *options,
     attr->sample_type |= PERF_SAMPLE_PHYS_ADDR;
 #endif
 
+    /*
+     * IBS often works even if a friendly alias is not exposed or not required
+     * by the kernel. So we try the symbolic event first, but tolerate failure
+     * and still proceed with the PMU type alone.
+     */
     ret = pmu_encode_event("ibs_op", "cycles", &config, &config1, &config2,
                            reason, reason_len);
     if (ret != 0) {

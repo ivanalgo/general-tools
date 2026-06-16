@@ -223,6 +223,14 @@ void perf_session_close(struct perf_session *session);
 static inline int perf_event_open_syscall(struct perf_event_attr *attr,
                                           pid_t pid, int cpu, int group_fd,
                                           unsigned long flags) {
+    /*
+     * perf_event_open arguments used by this project:
+     * - attr: event definition and sample payload layout.
+     * - pid : target task/TID when profiling per-thread; -1 in system-wide mode.
+     * - cpu : target CPU in system-wide mode; -1 in per-thread mode.
+     * - group_fd: always -1 here, meaning no event grouping.
+     * - flags: currently 0, so we rely on the default perf behavior.
+     */
     return (int)syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
 }
 

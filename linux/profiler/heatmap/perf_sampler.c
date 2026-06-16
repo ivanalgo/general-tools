@@ -256,9 +256,21 @@ int perf_session_open(struct perf_session *session,
         pid_t pid = options->system_wide ? -1 : tids[i];
         int cpu = options->system_wide ? i : -1;
 
+        /*
+         * perf_event_open target selection convention:
+         * - system-wide profiling: pid=-1 and cpu=<online cpu index>
+         * - per-thread profiling : pid=<tid> and cpu=-1
+         *
+         * The code never mixes pid>=0 with cpu>=0 because the profiler chooses
+         * either "one event per CPU" or "one event per thread".
+         */
         handle->cpu = cpu;
         handle->map_len = (options->mmap_pages + 1) * session->page_size;
 
+        /*
+         * group_fd=-1 means this event is opened standalone rather than as part
+         * of a perf event group. flags=0 keeps the default perf semantics.
+         */
         handle->fd = perf_event_open_syscall(&attr, pid, cpu, -1, 0);
         if (handle->fd < 0) {
             if (!options->system_wide) {
