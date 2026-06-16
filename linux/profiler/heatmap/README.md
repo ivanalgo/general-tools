@@ -45,7 +45,7 @@ Main command-line options come from `main.c:92`.
 
 ### Common examples
 
-Profile the current process for 5 seconds:
+Profile system-wide for 5 seconds:
 
 ```bash
 ./memheat_profiler
@@ -98,8 +98,8 @@ Track more pages and report more entries:
 
 ### Target selection
 
-- `--pid <pid>`: profile a specific process. If omitted, the tool profiles itself by default.
-- `--system`: profile all online CPUs system-wide.
+- `--pid <pid>`: profile a specific process.
+- `--system`: profile all online CPUs system-wide. If omitted, the tool now profiles system-wide by default.
 - `--user-only`: exclude kernel samples.
 
 ### Backend selection
@@ -148,6 +148,32 @@ The resolution logic is implemented in `heatmap.c:293`.
 - `--cooling-step <f>`: decrement per interval in step mode, default `1.0`
 
 Cooling is implemented in `heatmap.c:404`.
+
+#### Cooling principle
+
+Cooling is used to make the heatmap emphasize **recently active pages** instead of letting old hotspots dominate forever.
+
+The implementation follows this sequence:
+
+1. Before a new sample is accounted, the profiler compares the sample timestamp with the last cooling timestamp in `heatmap.c:415`.
+2. If one or more cooling intervals have elapsed, it walks every tracked page and reduces the existing heat in `heatmap.c:430`.
+3. In `step` mode, each elapsed interval subtracts a fixed amount from the page heat in `heatmap.c:437`.
+4. In `exp` mode, each elapsed interval multiplies the page heat by `cooling_decay` in `heatmap.c:440`.
+5. After cooling is applied, the incoming sample contributes `+1.0` heat in `heatmap.c:504`.
+
+So the effective update rule is:
+
+```text
+page heat = cool(previous heat, elapsed time) + 1.0
+```
+
+Practical effect:
+
+- pages that were hot only in the past gradually cool down
+- pages that continue to receive samples remain hot
+- the reported hot/warm/cold state becomes more sensitive to phase changes in workload behavior
+
+With the default `exp` mode and `cooling_decay = 0.80`, each elapsed cooling interval keeps 80% of the previous heat and decays 20% away.
 
 ## Heat calculation
 
@@ -353,7 +379,7 @@ Physical address translation may depend on kernel support and permissions for `/
 ## Notes and limitations
 
 - Heat is sample-based, not direct bandwidth or latency.
-- A page becomes hot because it is sampled frequently, especially after cooling is applied.
+- A page becomes hot because it is sampled frequently and still retains high heat after cooling.
 - Output quality depends on PMU support, privilege level, sampling period, and workload behavior.
 - Physical address availability depends on kernel and PMU support.
 
@@ -381,4 +407,10 @@ System-wide JSON report:
 
 ```bash
 ./memheat_profiler --system --output json --output-file system-report.json
+```
+
+Specific-process report:
+
+```bash
+./memheat_profiler --pid 12345 --output json --output-file process-report.json
 ```

@@ -45,7 +45,7 @@ make
 
 ### 常见示例
 
-默认方式运行 5 秒，分析当前进程：
+默认方式运行 5 秒，分析整机系统范围：
 
 ```bash
 ./memheat_profiler
@@ -98,8 +98,8 @@ make
 
 ### 目标选择
 
-- `--pid <pid>`：分析指定进程；如果不传，默认分析自身。
-- `--system`：按系统范围分析所有在线 CPU。
+- `--pid <pid>`：分析指定进程。
+- `--system`：按系统范围分析所有在线 CPU；如果不传，现在默认就是整系统采样。
 - `--user-only`：排除内核态 sample。
 
 ### 后端选择
@@ -148,6 +148,32 @@ make
 - `--cooling-step <f>`：step 模式下每个周期减少多少，默认 `1.0`
 
 cooling 实现在 `heatmap.c:404`。
+
+#### Cooling 机制原理
+
+Cooling 的目的，是让热图更偏向反映**最近一段时间仍然活跃的 page**，避免历史上的热点长期“挂住”高 heat。
+
+整体流程如下：
+
+1. 每次新 sample 到来前，先用 sample 时间戳与上一次 cooling 时间做比较，逻辑在 `heatmap.c:415`。
+2. 如果已经跨过一个或多个 cooling 周期，就遍历所有已跟踪 page，并在 `heatmap.c:430` 对旧 heat 做衰减。
+3. `step` 模式下，每经过一个周期，就按固定值减少 heat，逻辑在 `heatmap.c:437`。
+4. `exp` 模式下，每经过一个周期，就把 heat 乘以 `cooling_decay`，逻辑在 `heatmap.c:440`。
+5. 完成 cooling 后，再把当前 sample 贡献的 `+1.0` heat 加到 page 上，逻辑在 `heatmap.c:504`。
+
+因此可以把 heat 更新理解为：
+
+```text
+page heat = cooling 之后的旧 heat + 1.0
+```
+
+它带来的实际效果是：
+
+- 只在过去短暂变热的 page，会随着时间逐渐降温
+- 持续被采样命中的 page，会保持较高 heat
+- hot / warm / cold 的结果会更敏感地反映 workload 的阶段性变化
+
+按默认配置看，`exp` 模式配合 `cooling_decay = 0.80`，表示每过一个 cooling 周期，旧 heat 保留 80%，衰减 20%。
 
 ## Heat 是怎么计算的
 
@@ -353,7 +379,7 @@ summary 会把所有 page 聚合成：
 ## 注意事项与限制
 
 - heat 反映的是采样热度，不是直接的带宽值或延迟值。
-- 一个 page 之所以变 hot，本质上是因为它被频繁采样，且 cooling 后依然保持较高 heat。
+- 一个 page 之所以变 hot，本质上是因为它被频繁采样，且在 cooling 后依然保持较高 heat。
 - 输出质量受 PMU 支持、权限、采样周期以及 workload 行为影响。
 - physical address 能否获取取决于 PMU 和内核支持情况。
 
@@ -381,4 +407,10 @@ summary 会把所有 page 聚合成：
 
 ```bash
 ./memheat_profiler --system --output json --output-file system-report.json
+```
+
+输出指定进程的 JSON 报告：
+
+```bash
+./memheat_profiler --pid 12345 --output json --output-file process-report.json
 ```

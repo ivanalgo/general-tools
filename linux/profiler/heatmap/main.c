@@ -5,8 +5,8 @@
 
 static void set_default_options(struct profiler_options *options) {
     memset(options, 0, sizeof(*options));
-    options->pid = 0;
-    options->system_wide = false;
+    options->pid = -1;
+    options->system_wide = true;
     options->user_only = false;
     options->duration_sec = 5;
     options->poll_timeout_ms = 250;
@@ -92,8 +92,8 @@ static enum summary_metric parse_summary_metric(const char *text) {
 static void usage(const char *prog) {
     fprintf(stderr,
             "Usage: %s [options]\n"
-            "  --pid <pid>              profile a process (default: self)\n"
-            "  --system                 profile system-wide on all online CPUs\n"
+            "  --pid <pid>              profile a specific process\n"
+            "  --system                 profile system-wide on all online CPUs (default)\n"
             "  --backend <auto|pebs|ibs>\n"
             "  --duration <sec>         profiling duration, default 5\n"
             "  --sample-period <n>      PMU sample period, default 4000\n"
@@ -165,6 +165,7 @@ int main(int argc, char **argv) {
         switch (opt) {
         case 'p':
             options.pid = (pid_t)atoi(optarg);
+            options.system_wide = false;
             break;
         case 's':
             options.system_wide = true;
