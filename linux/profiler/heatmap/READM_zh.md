@@ -57,6 +57,12 @@ make
 ./memheat_profiler --pid 12345
 ```
 
+使用短参数的等价写法：
+
+```bash
+./memheat_profiler -p 12345 -d 10 -t 50
+```
+
 全系统分析：
 
 ```bash
@@ -74,6 +80,12 @@ make
 
 ```bash
 ./memheat_profiler --output json --output-file report.json
+```
+
+使用短参数的等价写法：
+
+```bash
+./memheat_profiler -o json -f report.json -r summary
 ```
 
 只看 summary：
@@ -98,9 +110,9 @@ make
 
 ### 目标选择
 
-- `--pid <pid>`：分析指定进程，并从默认的整系统模式切换到进程模式。
-- `--system`：按系统范围分析所有在线 CPU；如果不传，现在默认就是整系统采样。
-- `--user-only`：排除内核态 sample；如果不传，则可能同时包含用户态和内核态 sample。
+- `-p, --pid <pid>`：分析指定进程，并从默认的整系统模式切换到进程模式。
+- `-s, --system`：按系统范围分析所有在线 CPU；如果不传，现在默认就是整系统采样。
+- `-u, --user-only`：排除内核态 sample；如果不传，则可能同时包含用户态和内核态 sample。
 
 目标选择补充说明：
 
@@ -109,7 +121,7 @@ make
 
 ### 后端选择
 
-- `--backend auto|pebs|ibs`：默认 `auto`
+- `-b, --backend auto|pebs|ibs`：默认 `auto`
 
 自动后端选择行为如下：
 
@@ -119,23 +131,23 @@ make
 
 ### 采样控制
 
-- `--duration <sec>`：采样时长，默认 `5`
-- `--sample-period <n>`：PMU 采样周期，默认 `4000`
-- `--mmap-pages <n>`：perf ring 页数，默认 `128`
-- `--max-pages <n>`：最多跟踪的页面数，默认 `65536`
+- `-d, --duration <sec>`：采样时长，默认 `5`
+- `-P, --sample-period <n>`：PMU 采样周期，默认 `4000`
+- `-m, --mmap-pages <n>`：perf ring 页数，默认 `128`
+- `-M, --max-pages <n>`：最多跟踪的页面数，默认 `65536`
 
 ### 报告控制
 
-- `--top <n>`：detail 模式中输出前 N 个 page，默认 `20`
-- `--process-top <n>`：summary 中输出前 N 个进程，默认 `10`
-- `--report-mode detail|summary|both`：默认 `both`
-- `--summary-metric pages|heat|samples`：默认 `pages`
-- `--output text|json|csv`：默认 `text`
-- `--output-file <path>`：输出到文件而不是 stdout
+- `-t, --top <n>`：detail 模式中输出前 N 个 page，默认 `20`
+- `-T, --process-top <n>`：summary 中输出前 N 个进程，默认 `10`
+- `-r, --report-mode detail|summary|both`：默认 `both`
+- `-S, --summary-metric pages|heat|samples`：默认 `pages`
+- `-o, --output text|json|csv`：默认 `text`
+- `-f, --output-file <path>`：输出到文件而不是 stdout
 
 ### 地址模式
 
-- `--addr-mode auto|virtual|physical`：默认 `auto`
+- `-a, --addr-mode auto|virtual|physical`：默认 `auto`
 
 行为如下：
 
@@ -147,7 +159,7 @@ make
 
 ### Heat 与分类控制
 
-- `--heat-policy absolute|percentile`：默认 `absolute`
+- `-H, --heat-policy absolute|percentile`：默认 `absolute`
 - `--hot-threshold <f>`：在 `absolute` 模式下生效，默认 `20.0`
 - `--cold-threshold <f>`：在 `absolute` 模式下生效，默认 `3.0`
 - `--hot-percent <f>`：在 `percentile` 模式下生效，默认 `10.0`
@@ -161,8 +173,8 @@ make
 
 ### Cooling 控制
 
-- `--cooling none|step|exp`：默认 `exp`
-- `--cooling-interval-ms <n>`：默认 `500`
+- `-c, --cooling none|step|exp`：默认 `exp`
+- `-I, --cooling-interval-ms <n>`：默认 `500`
 - `--cooling-decay <f>`：指数衰减因子，默认 `0.80`
 - `--cooling-step <f>`：step 模式下每个周期减少多少，默认 `1.0`
 

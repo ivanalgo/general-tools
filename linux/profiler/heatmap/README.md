@@ -57,6 +57,12 @@ Profile a specific process:
 ./memheat_profiler --pid 12345
 ```
 
+The same command using short options:
+
+```bash
+./memheat_profiler -p 12345 -d 10 -t 50
+```
+
 Profile system-wide:
 
 ```bash
@@ -74,6 +80,12 @@ Write JSON output to a file:
 
 ```bash
 ./memheat_profiler --output json --output-file report.json
+```
+
+The same idea using short options:
+
+```bash
+./memheat_profiler -o json -f report.json -r summary
 ```
 
 Show summary only:
@@ -98,9 +110,9 @@ Track more pages and report more entries:
 
 ### Target selection
 
-- `--pid <pid>`: profile a specific process and switch from the default system-wide mode to process mode.
-- `--system`: profile all online CPUs system-wide. If omitted, the tool now profiles system-wide by default.
-- `--user-only`: exclude kernel samples. If omitted, both user-space and kernel-space samples may be included.
+- `-p, --pid <pid>`: profile a specific process and switch from the default system-wide mode to process mode.
+- `-s, --system`: profile all online CPUs system-wide. If omitted, the tool now profiles system-wide by default.
+- `-u, --user-only`: exclude kernel samples. If omitted, both user-space and kernel-space samples may be included.
 
 Target selection notes:
 
@@ -109,7 +121,7 @@ Target selection notes:
 
 ### Backend selection
 
-- `--backend auto|pebs|ibs`: default `auto`
+- `-b, --backend auto|pebs|ibs`: default `auto`
 
 Automatic backend selection works as follows:
 
@@ -119,23 +131,23 @@ Automatic backend selection works as follows:
 
 ### Sampling controls
 
-- `--duration <sec>`: profiling duration, default `5`
-- `--sample-period <n>`: PMU sample period, default `4000`
-- `--mmap-pages <n>`: perf ring pages, default `128`
-- `--max-pages <n>`: max tracked pages, default `65536`
+- `-d, --duration <sec>`: profiling duration, default `5`
+- `-P, --sample-period <n>`: PMU sample period, default `4000`
+- `-m, --mmap-pages <n>`: perf ring pages, default `128`
+- `-M, --max-pages <n>`: max tracked pages, default `65536`
 
 ### Report controls
 
-- `--top <n>`: top N pages in the detail view, default `20`
-- `--process-top <n>`: top N processes in the summary, default `10`
-- `--report-mode detail|summary|both`: default `both`
-- `--summary-metric pages|heat|samples`: default `pages`
-- `--output text|json|csv`: default `text`
-- `--output-file <path>`: write output to a file instead of stdout
+- `-t, --top <n>`: top N pages in the detail view, default `20`
+- `-T, --process-top <n>`: top N processes in the summary, default `10`
+- `-r, --report-mode detail|summary|both`: default `both`
+- `-S, --summary-metric pages|heat|samples`: default `pages`
+- `-o, --output text|json|csv`: default `text`
+- `-f, --output-file <path>`: write output to a file instead of stdout
 
 ### Address mode
 
-- `--addr-mode auto|virtual|physical`: default `auto`
+- `-a, --addr-mode auto|virtual|physical`: default `auto`
 
 Behavior:
 
@@ -147,7 +159,7 @@ In `auto` mode, the profiler tries to use physical addresses when they are avail
 
 ### Heat and classification controls
 
-- `--heat-policy absolute|percentile`: default `absolute`
+- `-H, --heat-policy absolute|percentile`: default `absolute`
 - `--hot-threshold <f>`: used in `absolute` mode, default `20.0`
 - `--cold-threshold <f>`: used in `absolute` mode, default `3.0`
 - `--hot-percent <f>`: used in `percentile` mode, default `10.0`
@@ -161,8 +173,8 @@ Classification notes:
 
 ### Cooling controls
 
-- `--cooling none|step|exp`: default `exp`
-- `--cooling-interval-ms <n>`: default `500`
+- `-c, --cooling none|step|exp`: default `exp`
+- `-I, --cooling-interval-ms <n>`: default `500`
 - `--cooling-decay <f>`: exponential decay factor, default `0.80`
 - `--cooling-step <f>`: decrement per interval in step mode, default `1.0`
 

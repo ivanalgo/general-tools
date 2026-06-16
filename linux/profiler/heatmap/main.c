@@ -92,26 +92,26 @@ static enum summary_metric parse_summary_metric(const char *text) {
 static void usage(const char *prog) {
     fprintf(stderr,
             "Usage: %s [options]\n"
-            "  --pid <pid>              profile a specific process\n"
-            "  --system                 profile system-wide on all online CPUs (default)\n"
-            "  --backend <auto|pebs|ibs>\n"
-            "  --duration <sec>         profiling duration, default 5\n"
-            "  --sample-period <n>      PMU sample period, default 4000\n"
-            "  --mmap-pages <n>         perf ring pages, default 128\n"
-            "  --max-pages <n>          max tracked pages, default 65536\n"
-            "  --top <n>                report top N pages, default 20\n"
-            "  --process-top <n>        report top N processes, default 10\n"
-            "  --report-mode <detail|summary|both>\n"
-            "  --summary-metric <pages|heat|samples>\n"
-            "  --user-only              exclude kernel samples\n"
-            "  --heat-policy <absolute|percentile>\n"
+            "  -p, --pid <pid>          profile a specific process\n"
+            "  -s, --system             profile system-wide on all online CPUs (default)\n"
+            "  -b, --backend <auto|pebs|ibs>\n"
+            "  -d, --duration <sec>     profiling duration, default 5\n"
+            "  -P, --sample-period <n>  PMU sample period, default 4000\n"
+            "  -m, --mmap-pages <n>     perf ring pages, default 128\n"
+            "  -M, --max-pages <n>      max tracked pages, default 65536\n"
+            "  -t, --top <n>            report top N pages, default 20\n"
+            "  -T, --process-top <n>    report top N processes, default 10\n"
+            "  -r, --report-mode <detail|summary|both>\n"
+            "  -S, --summary-metric <pages|heat|samples>\n"
+            "  -u, --user-only          exclude kernel samples\n"
+            "  -H, --heat-policy <absolute|percentile>\n"
             "  --hot-percent <f>        top percentile marked hot, default 10\n"
             "  --cold-percent <f>       bottom percentile marked cold, default 50\n"
-            "  --addr-mode <auto|virtual|physical>\n"
-            "  --output <text|json|csv>\n"
-            "  --output-file <path>     write report to file instead of stdout\n"
-            "  --cooling <none|step|exp>\n"
-            "  --cooling-interval-ms <n>\n"
+            "  -a, --addr-mode <auto|virtual|physical>\n"
+            "  -o, --output <text|json|csv>\n"
+            "  -f, --output-file <path> write report to file instead of stdout\n"
+            "  -c, --cooling <none|step|exp>\n"
+            "  -I, --cooling-interval-ms <n>\n"
             "  --cooling-decay <f>      exp cooling factor, default 0.80\n"
             "  --cooling-step <f>       step cooling decrement, default 1.0\n"
             "  --hot-threshold <f>\n"
@@ -138,18 +138,18 @@ int main(int argc, char **argv) {
         {"mmap-pages", required_argument, NULL, 'm'},
         {"max-pages", required_argument, NULL, 'M'},
         {"top", required_argument, NULL, 't'},
-        {"process-top", required_argument, NULL, 1008},
-        {"report-mode", required_argument, NULL, 1010},
-        {"summary-metric", required_argument, NULL, 1014},
+        {"process-top", required_argument, NULL, 'T'},
+        {"report-mode", required_argument, NULL, 'r'},
+        {"summary-metric", required_argument, NULL, 'S'},
         {"user-only", no_argument, NULL, 'u'},
-        {"heat-policy", required_argument, NULL, 1011},
+        {"heat-policy", required_argument, NULL, 'H'},
         {"hot-percent", required_argument, NULL, 1012},
         {"cold-percent", required_argument, NULL, 1013},
-        {"addr-mode", required_argument, NULL, 1006},
-        {"output", required_argument, NULL, 1007},
-        {"output-file", required_argument, NULL, 1009},
-        {"cooling", required_argument, NULL, 1000},
-        {"cooling-interval-ms", required_argument, NULL, 1001},
+        {"addr-mode", required_argument, NULL, 'a'},
+        {"output", required_argument, NULL, 'o'},
+        {"output-file", required_argument, NULL, 'f'},
+        {"cooling", required_argument, NULL, 'c'},
+        {"cooling-interval-ms", required_argument, NULL, 'I'},
         {"cooling-decay", required_argument, NULL, 1002},
         {"cooling-step", required_argument, NULL, 1003},
         {"hot-threshold", required_argument, NULL, 1004},
@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
 
     set_default_options(&options);
 
-    while ((opt = getopt_long(argc, argv, "p:sb:d:P:m:M:t:uh",
+    while ((opt = getopt_long(argc, argv, "p:sb:d:P:m:M:t:T:r:S:uH:a:o:f:c:I:h",
                               long_options, NULL)) != -1) {
         switch (opt) {
         case 'p':
@@ -189,19 +189,19 @@ int main(int argc, char **argv) {
         case 't':
             options.top_n = (unsigned)strtoul(optarg, NULL, 0);
             break;
-        case 1008:
+        case 'T':
             options.process_top_n = (unsigned)strtoul(optarg, NULL, 0);
             break;
-        case 1010:
+        case 'r':
             options.report_mode = parse_report_mode(optarg);
             break;
-        case 1014:
+        case 'S':
             options.summary_metric = parse_summary_metric(optarg);
             break;
         case 'u':
             options.user_only = true;
             break;
-        case 1011:
+        case 'H':
             options.heat_policy = parse_heat_policy(optarg);
             break;
         case 1012:
@@ -210,19 +210,19 @@ int main(int argc, char **argv) {
         case 1013:
             options.cold_percent = strtod(optarg, NULL);
             break;
-        case 1006:
+        case 'a':
             options.stats_address_mode = parse_stats_address_mode(optarg);
             break;
-        case 1007:
+        case 'o':
             options.output_format = parse_output_format(optarg);
             break;
-        case 1009:
+        case 'f':
             options.output_path = optarg;
             break;
-        case 1000:
+        case 'c':
             options.cooling_mode = parse_cooling_mode(optarg);
             break;
-        case 1001:
+        case 'I':
             options.cooling_interval_ns =
                 strtoull(optarg, NULL, 0) * 1000ULL * 1000ULL;
             break;
