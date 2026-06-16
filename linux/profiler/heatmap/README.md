@@ -7,7 +7,7 @@ The tool supports two backend families:
 - **PEBS** on Intel systems
 - **IBS** on AMD systems
 
-The binary name is `memheat_profiler` as defined in `Makefile:5`.
+The binary name is `memheat_profiler`.
 
 ## What the tool does
 
@@ -21,7 +21,7 @@ At a high level, the profiler:
 6. Applies hot/warm/cold classification.
 7. Prints detail and/or summary reports.
 
-The current implementation adds `1.0` heat per accepted sample, optionally with cooling over time. The relevant logic is in `heatmap.c:481` and `heatmap.c:504`.
+The current implementation adds `1.0` heat per accepted sample, optionally with cooling over time.
 
 ## Build
 
@@ -41,7 +41,7 @@ This builds:
 ./memheat_profiler [options]
 ```
 
-Main command-line options come from `main.c:92`.
+The main command-line options are summarized below.
 
 ### Common examples
 
@@ -98,15 +98,20 @@ Track more pages and report more entries:
 
 ### Target selection
 
-- `--pid <pid>`: profile a specific process.
+- `--pid <pid>`: profile a specific process and switch from the default system-wide mode to process mode.
 - `--system`: profile all online CPUs system-wide. If omitted, the tool now profiles system-wide by default.
-- `--user-only`: exclude kernel samples.
+- `--user-only`: exclude kernel samples. If omitted, both user-space and kernel-space samples may be included.
+
+Target selection notes:
+
+- Use either `--pid` or `--system` for clarity.
+- If both are provided, the last one on the command line takes effect.
 
 ### Backend selection
 
-- `--backend auto|pebs|ibs`
+- `--backend auto|pebs|ibs`: default `auto`
 
-Automatic backend selection is implemented in `backend.c:47`:
+Automatic backend selection works as follows:
 
 - Intel (`GenuineIntel`) prefers **PEBS**.
 - AMD (`AuthenticAMD`) prefers **IBS**.
@@ -130,7 +135,7 @@ Automatic backend selection is implemented in `backend.c:47`:
 
 ### Address mode
 
-- `--addr-mode auto|virtual|physical`
+- `--addr-mode auto|virtual|physical`: default `auto`
 
 Behavior:
 
@@ -138,16 +143,28 @@ Behavior:
 - `physical`: use physical addresses when available, otherwise try `/proc/<pid>/pagemap` translation.
 - `auto`: prefer physical addresses when available, otherwise fall back to backend-specific page selection.
 
-The resolution logic is implemented in `heatmap.c:293`.
+In `auto` mode, the profiler tries to use physical addresses when they are available; otherwise it falls back to the backend's normal page-resolution path.
+
+### Heat and classification controls
+
+- `--heat-policy absolute|percentile`: default `absolute`
+- `--hot-threshold <f>`: used in `absolute` mode, default `20.0`
+- `--cold-threshold <f>`: used in `absolute` mode, default `3.0`
+- `--hot-percent <f>`: used in `percentile` mode, default `10.0`
+- `--cold-percent <f>`: used in `percentile` mode, default `50.0`
+
+Classification notes:
+
+- In `absolute` mode, `hot_threshold` and `cold_threshold` determine hot/warm/cold.
+- In `percentile` mode, `hot_percent` and `cold_percent` determine hot/warm/cold by rank after sorting pages by heat.
+- Changing `--summary-metric` does not affect classification; it only changes how summary ratios are computed.
 
 ### Cooling controls
 
 - `--cooling none|step|exp`: default `exp`
-- `--cooling-interval-ms <n>`
+- `--cooling-interval-ms <n>`: default `500`
 - `--cooling-decay <f>`: exponential decay factor, default `0.80`
 - `--cooling-step <f>`: decrement per interval in step mode, default `1.0`
-
-Cooling is implemented in `heatmap.c:404`.
 
 #### Cooling principle
 
@@ -155,11 +172,11 @@ Cooling is used to make the heatmap emphasize **recently active pages** instead 
 
 The implementation follows this sequence:
 
-1. Before a new sample is accounted, the profiler compares the sample timestamp with the last cooling timestamp in `heatmap.c:415`.
-2. If one or more cooling intervals have elapsed, it walks every tracked page and reduces the existing heat in `heatmap.c:430`.
-3. In `step` mode, each elapsed interval subtracts a fixed amount from the page heat in `heatmap.c:437`.
-4. In `exp` mode, each elapsed interval multiplies the page heat by `cooling_decay` in `heatmap.c:440`.
-5. After cooling is applied, the incoming sample contributes `+1.0` heat in `heatmap.c:504`.
+1. Before a new sample is accounted, the profiler checks how much time has passed since the last cooling pass.
+2. If one or more cooling intervals have elapsed, it walks every tracked page and reduces the existing heat.
+3. In `step` mode, each elapsed interval subtracts a fixed amount from the page heat.
+4. In `exp` mode, each elapsed interval multiplies the page heat by `cooling_decay`.
+5. After cooling is applied, the incoming sample contributes `+1.0` heat.
 
 So the effective update rule is:
 
@@ -167,13 +184,24 @@ So the effective update rule is:
 page heat = cool(previous heat, elapsed time) + 1.0
 ```
 
+Key values and knobs:
+
+- Cooling mode: `--cooling none|step|exp`, default `exp`
+- Cooling interval: `--cooling-interval-ms <n>`, default `500` ms
+- Step decrement: `--cooling-step <f>`, default `1.0`
+- Exponential decay factor: `--cooling-decay <f>`, default `0.80`
+
 Practical effect:
 
 - pages that were hot only in the past gradually cool down
 - pages that continue to receive samples remain hot
 - the reported hot/warm/cold state becomes more sensitive to phase changes in workload behavior
 
-With the default `exp` mode and `cooling_decay = 0.80`, each elapsed cooling interval keeps 80% of the previous heat and decays 20% away.
+Examples:
+
+- `--cooling none`: disable cooling completely; heat only grows as new samples arrive
+- `--cooling step --cooling-interval-ms 500 --cooling-step 1.0`: every 500 ms, subtract `1.0` from each tracked page heat, but never below `0`
+- `--cooling exp --cooling-interval-ms 500 --cooling-decay 0.80`: every 500 ms, keep 80% of the previous heat and decay 20% away
 
 ## Heat calculation
 
@@ -192,7 +220,7 @@ Additional fields are also tracked:
 - `last_ip`, `last_data_src`
 - owner PID/TID statistics
 
-The sample parsing path is implemented in `perf_sampler.c:78`, and heat accounting is in `heatmap.c:481`.
+In other words, each accepted sample contributes to exactly one page entry, and the profiler tracks both heat and supporting metadata for that page.
 
 ## Hot / warm / cold classification
 
@@ -201,11 +229,11 @@ The profiler supports two classification policies:
 - **absolute**
 - **percentile**
 
-The policy parser is in `main.c:75`, and the classifier is in `heatmap.c:114`.
+By default, the tool uses **absolute** classification.
 
 ### 1. Absolute thresholds
 
-Default values are defined in `main.c:24` and `main.c:25`:
+Default values:
 
 - `hot_threshold = 20.0`
 - `cold_threshold = 3.0`
@@ -215,8 +243,6 @@ The current absolute classification logic is:
 - **hot**: `heat >= hot_threshold`
 - **cold**: `heat < cold_threshold`
 - **warm**: everything else
-
-This logic is implemented in `heatmap.c:28`.
 
 With the current defaults, the classes are:
 
@@ -252,7 +278,7 @@ This means:
 - bottom 50% of ranked pages → cold
 - the middle section → warm
 
-The percentile logic is implemented in `heatmap.c:118`.
+If a percentile would otherwise round down to zero while the configured percentage is greater than zero, the tool still classifies at least one page into that bucket when pages exist.
 
 Example:
 
@@ -269,7 +295,7 @@ The summary aggregates all tracked pages into:
 - warm pages / bytes / heat / samples
 - cold pages / bytes / heat / samples
 
-Aggregation happens in `heatmap.c:155`.
+This aggregation is done over all tracked pages collected during the run.
 
 The summary metric controls how the ratio column is computed:
 
@@ -277,7 +303,7 @@ The summary metric controls how the ratio column is computed:
 - `heat`: ratio based on summed heat
 - `samples`: ratio based on sample counts
 
-The summary metric helpers are implemented in `heatmap.c:69` and `heatmap.c:82`.
+So changing `--summary-metric` changes the ratio basis in the summary, but does not change how pages are classified.
 
 Example summary-oriented run:
 
@@ -318,12 +344,12 @@ High-level idea:
 
 In this project, the PEBS backend:
 
-- requires vendor `GenuineIntel` (`backend_pebs.c:6`)
-- requires the `cpu` PMU to exist (`backend_pebs.c:9`)
-- requests precise sampling with `precise_ip = 2` (`backend_pebs.c:49`)
-- samples memory-load related information (`backend_pebs.c:59`)
-- falls back to raw event encoding `event=0xcd,umask=0x1,ldlat=3` if `mem-loads` is not available (`backend_pebs.c:65`)
-- requests sample fields including IP, TID, time, address, CPU, weight, data source, and physical address when supported (`backend_pebs.c:52`)
+- requires vendor `GenuineIntel`
+- requires the `cpu` PMU to exist
+- requests precise sampling with `precise_ip = 2`
+- samples memory-load related information
+- falls back to raw event encoding `event=0xcd,umask=0x1,ldlat=3` if `mem-loads` is not available
+- requests sample fields including IP, TID, time, address, CPU, weight, data source, and physical address when supported
 
 Practical meaning:
 
@@ -343,11 +369,11 @@ High-level idea:
 
 In this project, the IBS backend:
 
-- requires vendor `AuthenticAMD` (`backend_ibs.c:6`)
-- requires the `ibs_op` PMU to exist (`backend_ibs.c:9`)
-- uses `precise_ip = 2` (`backend_ibs.c:49`)
-- requests IP, TID, time, address, CPU, weight, data source, and physical address when available (`backend_ibs.c:52`)
-- tries to encode an `ibs_op` event named `cycles`, but tolerates failure and still uses the PMU type (`backend_ibs.c:59`)
+- requires vendor `AuthenticAMD`
+- requires the `ibs_op` PMU to exist
+- uses `precise_ip = 2`
+- requests IP, TID, time, address, CPU, weight, data source, and physical address when available
+- tries to encode an `ibs_op` event named `cycles`, but tolerates failure and still uses the PMU type
 
 Practical meaning:
 
@@ -371,8 +397,6 @@ You may need sufficient perf privileges, for example:
 
 - `CAP_PERFMON`
 - a permissive `kernel.perf_event_paranoid`
-
-The process-open error path explicitly points this out in `perf_sampler.c:266`.
 
 Physical address translation may depend on kernel support and permissions for `/proc/<pid>/pagemap`.
 
