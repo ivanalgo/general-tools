@@ -271,6 +271,7 @@ class MetricSpec:
     value_func: Optional[Callable[[SystemSnapshot, Optional[ProcessSnapshot]], int]] = None
     children: List["MetricSpec"] = field(default_factory=list)
     children_factory: Optional[Callable[[SystemSnapshot, Optional[ProcessSnapshot]], List["MetricSpec"]]] = None
+    children_sum_func: Optional[Callable[[SystemSnapshot, Optional[ProcessSnapshot]], int]] = None
     description: str = ""
     bound_process: Optional[ProcessSnapshot] = None
 
@@ -282,12 +283,14 @@ class MetricNode:
     value_kb: int
     description: str = ""
     children: List["MetricNode"] = field(default_factory=list)
+    children_sum_kb: Optional[int] = None
 
     def to_dict(self) -> Dict[str, object]:
         return {
             "key": self.key,
             "label": self.label,
             "value_kb": self.value_kb,
+            "children_sum_kb": self.children_sum_kb,
             "description": self.description,
             "children": [child.to_dict() for child in self.children],
         }
@@ -335,12 +338,20 @@ def build_metric_tree(
     else:
         value_kb = sum(child.value_kb for child in child_nodes)
 
+    if spec.children_sum_func is not None:
+        children_sum_kb: Optional[int] = clamp_non_negative(spec.children_sum_func(snapshot, process))
+    elif child_nodes:
+        children_sum_kb = sum(child.value_kb for child in child_nodes)
+    else:
+        children_sum_kb = None
+
     return MetricNode(
         key=spec.key,
         label=spec.label,
         value_kb=value_kb,
         description=spec.description,
         children=child_nodes,
+        children_sum_kb=children_sum_kb,
     )
 
 
@@ -360,6 +371,18 @@ def process_leaf(key: str, field_name: Optional[str] = None, description: str = 
         source=SourceRef("process_metric", field_name or key),
         description=description,
     )
+
+
+def build_process_metric_specs(snapshot: SystemSnapshot, _process: Optional[ProcessSnapshot]) -> List[MetricSpec]:
+    return [
+        MetricSpec(
+            key=f"process_{proc.pid}",
+            label=proc.display_name,
+            value_func=lambda _snapshot, _proc, proc=proc: proc.total_rss,
+            description="单个进程的 RSS。",
+        )
+        for proc in snapshot.processes
+    ]
 
 
 def read_single_process(pid: int, include_smaps: bool = True) -> Optional[ProcessSnapshot]:
@@ -472,8 +495,9 @@ def build_spec_root() -> MetricSpec:
             MetricSpec(
                 key="kernel_modules",
                 label="KernelModules",
-                value_func=lambda snapshot, _proc: sum(int(module["size_kb"]) for module in snapshot.modules),
-                description="所有已加载内核模块的对象大小汇总；明细以表格方式单独输出。",
+                source=SourceRef("meminfo", "KernelModules"),
+                children_sum_func=lambda snapshot, _proc: sum(int(module["size_kb"]) for module in snapshot.modules),
+                description="数值来自 meminfo 的 KernelModules；子项合计为 /proc/modules 中所有模块对象大小汇总。",
             ),
             meminfo_leaf("Hugetlb", description="hugetlb 预留页。"),
         ],
@@ -495,7 +519,8 @@ def build_spec_root() -> MetricSpec:
         key="processes",
         label="进程占用(RSS汇总)",
         value_func=lambda snapshot, _proc: sum(proc.total_rss for proc in snapshot.processes),
-        description="进程总量为 RSS 汇总；进程明细以表格方式单独输出，shared 页跨进程可能重复计数。",
+        children_sum_func=lambda snapshot, _proc: sum(proc.total_rss for proc in snapshot.processes),
+        description="数值为所有进程 RSS 汇总；子项合计同样为逐进程 RSS 加总，进程明细以表格方式单独输出，shared 页跨进程可能重复计数。",
     )
 
     return MetricSpec(
@@ -543,10 +568,13 @@ def collect_tree_rows(
     else:
         ratio = "-"
 
+    children_sum = format_size(node.children_sum_kb, unit) if node.children_sum_kb is not None else "-"
+
     rows = [
         {
             "label": f"{indent}{node.label}",
             "value": format_size(node.value_kb, unit),
+            "children_sum": children_sum,
             "ratio": ratio,
         }
     ]
@@ -559,16 +587,18 @@ def render_tree_lines(node: MetricNode, unit: str) -> List[str]:
     rows = collect_tree_rows(node, unit)
     label_width = max(display_width("名称"), max(display_width(row["label"]) for row in rows))
     value_width = max(display_width("数值"), max(display_width(row["value"]) for row in rows))
+    children_sum_width = max(display_width("子项合计"), max(display_width(row["children_sum"]) for row in rows))
     ratio_width = max(display_width("占父节点比例"), max(display_width(row["ratio"]) for row in rows))
 
     header = "  ".join(
         [
             pad_display("名称", label_width, "left"),
             pad_display("数值", value_width, "right"),
+            pad_display("子项合计", children_sum_width, "right"),
             pad_display("占父节点比例", ratio_width, "right"),
         ]
     )
-    separator = "-" * (label_width + 2 + value_width + 2 + ratio_width)
+    separator = "-" * (label_width + 2 + value_width + 2 + children_sum_width + 2 + ratio_width)
     lines = [header, separator]
     for row in rows:
         lines.append(
@@ -576,6 +606,7 @@ def render_tree_lines(node: MetricNode, unit: str) -> List[str]:
                 [
                     pad_display(row["label"], label_width, "left"),
                     pad_display(row["value"], value_width, "right"),
+                    pad_display(row["children_sum"], children_sum_width, "right"),
                     pad_display(row["ratio"], ratio_width, "right"),
                 ]
             )
@@ -692,6 +723,30 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="是否显示 RSS 为 0 的进程",
     )
+    parser.add_argument(
+        "-p",
+        "--processes",
+        action="store_true",
+        help="输出进程明细表",
+    )
+    parser.add_argument(
+        "-m",
+        "--modules",
+        action="store_true",
+        help="输出内核模块明细表",
+    )
+    parser.add_argument(
+        "-s",
+        "--slabs",
+        action="store_true",
+        help="输出 slab 明细表",
+    )
+    parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        help="输出总表、全部明细表和说明",
+    )
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
@@ -716,10 +771,17 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print()
     else:
         print_tree(root_node, args.unit)
-        print_module_table(snapshot, args.unit)
-        print_slab_table(snapshot, args.unit)
-        print_process_table(snapshot, args.unit)
-        if snapshot.notes:
+        show_processes = args.all or args.processes
+        show_modules = args.all or args.modules
+        show_slabs = args.all or args.slabs
+
+        if show_modules:
+            print_module_table(snapshot, args.unit)
+        if show_slabs:
+            print_slab_table(snapshot, args.unit)
+        if show_processes:
+            print_process_table(snapshot, args.unit)
+        if args.all and snapshot.notes:
             print("\n说明:")
             for note in snapshot.notes:
                 print(f"- {note}")
