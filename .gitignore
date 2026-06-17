@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+
+*.o
+*.d
+
+linux/demo/avx/avx
+linux/issues_report/pgtable_not_released
+linux/profiler/heatmap/memheat_profiler
