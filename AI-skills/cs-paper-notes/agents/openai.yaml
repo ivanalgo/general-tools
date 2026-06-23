@@ -1,0 +1,4 @@
+interface:
+  display_name: "计算机论文读书笔记"
+  short_description: "整理计算机论文的深度读书笔记、方案图与实验评估"
+  default_prompt: "Use $cs-paper-notes 生成计算机论文的深度读书笔记，包含问题、方案图、实验评估、局限和讨论问题。"
