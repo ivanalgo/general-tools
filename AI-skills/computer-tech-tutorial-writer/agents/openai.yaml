@@ -1,0 +1,4 @@
+interface:
+  display_name: "计算机技术教程写作"
+  short_description: "编写结构清晰、图示渐进的计算机技术教程"
+  default_prompt: "Use $computer-tech-tutorial-writer 帮我把一个复杂计算机技术主题写成结构清晰、图示渐进、先讲基线再讲扩展的教程。"
