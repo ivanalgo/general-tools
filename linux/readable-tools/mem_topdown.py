@@ -9,7 +9,7 @@
 3. 新增数据来源时，只需要补一个 reader / resolver，或者补一个定义表项。
 4. 同时提供：
    - 系统视角：内核专有内存、空闲/可回收内存。
-    - 进程视角：列出所有进程，每进程一行输出 total / anon / stack / file / shmem；Java进程额外显示heap/metaspace/codecache/offheap细分。
+    - 进程视角：列出所有进程，每进程一行输出 total / anon / stack / file / shmem；Java进程额外缩进显示 JVM used 细分。
    - 内核模块视角：列出所有内核模块，每模块一行输出占用大小。
    - slab 视角：列出所有 slab cache，每 cache 一行输出占用大小。
 
@@ -154,15 +154,79 @@ def accounting_label(accounting_mode: str) -> str:
     return "PSS" if accounting_mode == "pss" else "RSS"
 
 
+def process_file_mapped_kb(snapshot: "SystemSnapshot") -> int:
+    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    process_file_total = sum(clamp_non_negative(proc.metrics.get("file", 0)) for proc in snapshot.processes)
+    return min(process_file_total, cached_total)
+
+
+def pure_page_cache_kb(snapshot: "SystemSnapshot") -> int:
+    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    return clamp_non_negative(cached_total - process_file_mapped_kb(snapshot))
+
+
 def get_java_memory_metrics(pid: int) -> Dict[str, int]:
     """
     尝试通过jcmd获取Java进程内存细分指标，返回单位为KB的字典。
-    需JVM开启NMT(-XX:NativeMemoryTracking=summary)才能获取完整信息，否则仅返回heap/metaspace基础信息。
+    输出以 used 为主，便于反映 JVM 内部实际使用量：
+    - heap/metaspace/class space 来自 GC.heap_info
+    - code cache used 来自 Compiler.codecache
+    - native committed 仅作为补充字段保留，用于解释 PSS 与 JVM used 的差异
     """
     if JCMD_PATH is None:
         return {}
 
     metrics: Dict[str, int] = {}
+
+    try:
+        result = subprocess.run(
+            [JCMD_PATH, str(pid), "GC.heap_info"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            output = result.stdout
+            heap_match = re.search(r"heap\s+total\s+\d+K,\s*used\s+(\d+)K", output)
+            if heap_match:
+                metrics["java_heap_used_kb"] = int(heap_match.group(1))
+
+            metaspace_used_match = re.search(r"Metaspace\s+used\s+(\d+)K", output)
+            class_space_used = None
+            metaspace_used = None
+            if metaspace_used_match:
+                metaspace_used = int(metaspace_used_match.group(1))
+
+            class_space_used_match = re.search(r"class space\s+used\s+(\d+)K", output)
+            if class_space_used_match:
+                class_space_used = int(class_space_used_match.group(1))
+                metrics["java_class_space_used_kb"] = class_space_used
+
+            if metaspace_used is not None:
+                if class_space_used is not None:
+                    metrics["java_metaspace_used_kb"] = max(metaspace_used - class_space_used, 0)
+                else:
+                    metrics["java_metaspace_used_kb"] = metaspace_used
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
+
+    try:
+        result = subprocess.run(
+            [JCMD_PATH, str(pid), "Compiler.codecache"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            code_used_total = 0
+            for match in re.finditer(r"^CodeHeap '.*?': size=\d+Kb used=(\d+)Kb ", result.stdout, re.MULTILINE):
+                code_used_total += int(match.group(1))
+            if code_used_total > 0:
+                metrics["java_code_cache_used_kb"] = code_used_total
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
 
     try:
         result = subprocess.run(
@@ -175,45 +239,31 @@ def get_java_memory_metrics(pid: int) -> Dict[str, int]:
         if result.returncode == 0:
             output = result.stdout
             heap_match = re.search(r"Java Heap\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)", output)
-            if heap_match:
-                metrics["java_heap_kb"] = int(heap_match.group(1))
-
-            class_match = re.search(r"-\s+Class\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)", output)
-            if class_match:
-                metrics["java_metaspace_kb"] = int(class_match.group(1))
-
-            code_match = re.search(r"-\s+Code\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)", output)
-            if code_match:
-                metrics["java_code_cache_kb"] = int(code_match.group(1))
-
             total_match = re.search(r"Total:\s+reserved=\d+KB,\s*committed=(\d+)KB", output)
-            if total_match and "java_heap_kb" in metrics:
+            if total_match and heap_match:
                 total_committed = int(total_match.group(1))
-                metrics["java_off_heap_kb"] = max(total_committed - metrics["java_heap_kb"], 0)
-            return metrics
-    except (subprocess.SubprocessError, OSError, ValueError):
-        pass
+                heap_committed = int(heap_match.group(1))
+                metrics["java_native_committed_kb"] = max(total_committed - heap_committed, 0)
 
-    try:
-        result = subprocess.run(
-            [JCMD_PATH, str(pid), "GC.heap_info"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        if result.returncode == 0:
-            output = result.stdout
-            heap_match = re.search(r"heap\s+.*?total\s+(\d+)K,\s*used\s+\d+K", output)
-            if heap_match:
-                metrics["java_heap_kb"] = int(heap_match.group(1))
-
-            metaspace_match = re.search(r"Metaspace\s+.*?committed\s*=\s*(\d+)KB?", output)
-            if not metaspace_match:
-                metaspace_match = re.search(r"Metaspace\s+.*?committed\s+(\d+)K", output)
-            if metaspace_match:
-                metrics["java_metaspace_kb"] = int(metaspace_match.group(1))
-            return metrics
+            nmt_category_patterns = {
+                "java_thread_committed_kb": r"-\s+Thread\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_gc_committed_kb": r"-\s+GC\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_other_committed_kb": r"-\s+Other\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_symbol_committed_kb": r"-\s+Symbol\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_internal_committed_kb": r"-\s+Internal\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_compiler_committed_kb": r"-\s+Compiler\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_nmt_committed_kb": r"-\s+Native Memory Tracking\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_arena_chunk_committed_kb": r"-\s+Arena Chunk\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_logging_committed_kb": r"-\s+Logging\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_arguments_committed_kb": r"-\s+Arguments\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_module_committed_kb": r"-\s+Module\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_synchronizer_committed_kb": r"-\s+Synchronizer\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_safepoint_committed_kb": r"-\s+Safepoint\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+            }
+            for key, pattern in nmt_category_patterns.items():
+                match = re.search(pattern, output)
+                if match:
+                    metrics[key] = int(match.group(1))
     except (subprocess.SubprocessError, OSError, ValueError):
         pass
 
@@ -340,10 +390,17 @@ class ProcessSnapshot:
             "stack_kb": self.metrics.get("stack", 0),
             "file_kb": self.metrics.get("file", 0),
             "shmem_kb": self.metrics.get("shmem", 0),
-            "java_heap_kb": self.metrics.get("java_heap_kb"),
-            "java_metaspace_kb": self.metrics.get("java_metaspace_kb"),
-            "java_code_cache_kb": self.metrics.get("java_code_cache_kb"),
-            "java_off_heap_kb": self.metrics.get("java_off_heap_kb"),
+            "java_heap_used_kb": self.metrics.get("java_heap_used_kb"),
+            "java_metaspace_used_kb": self.metrics.get("java_metaspace_used_kb"),
+            "java_class_space_used_kb": self.metrics.get("java_class_space_used_kb"),
+            "java_code_cache_used_kb": self.metrics.get("java_code_cache_used_kb"),
+            "java_native_committed_kb": self.metrics.get("java_native_committed_kb"),
+            "java_gc_committed_kb": self.metrics.get("java_gc_committed_kb"),
+            "java_thread_committed_kb": self.metrics.get("java_thread_committed_kb"),
+            "java_other_committed_kb": self.metrics.get("java_other_committed_kb"),
+            "java_symbol_committed_kb": self.metrics.get("java_symbol_committed_kb"),
+            "java_internal_committed_kb": self.metrics.get("java_internal_committed_kb"),
+            "java_compiler_committed_kb": self.metrics.get("java_compiler_committed_kb"),
         }
 
 
@@ -612,9 +669,13 @@ def collect_snapshot(
             notes.append("已禁用 smaps，RSS 模式下 stack/heap 细分将为 0。")
 
     if JCMD_PATH is not None:
-        notes.append("Java进程内存细分通过jcmd获取：JVM启动时添加-XX:NativeMemoryTracking=summary可获取完整heap/metaspace/codecache/offheap细分，未开启NMT时仅能获取heap/metaspace基础信息，权限不足时自动降级。")
+        notes.append("Java进程内存细分通过jcmd获取：主表缩进展示 JVM used（heap/meta/class/code）；若开启 -XX:NativeMemoryTracking=summary，还会额外展示 JVM runtime/native committed（如 GC/thread/other），用于解释 PSS 与 JVM used 的差异。")
     else:
         notes.append("未检测到jcmd命令，Java进程内存细分功能不可用。")
+
+    notes.append(
+        f"为避免与进程占用重复计算，树中的 Cached 已改为纯 page cache；其中纯 page cache = meminfo:Cached - 进程 file-map({accounting_label(accounting_mode)}) 汇总。"
+    )
 
     processes = collect_processes(
         include_smaps=include_smaps,
@@ -634,6 +695,13 @@ def collect_snapshot(
 
 def build_spec_root(accounting_mode: str) -> MetricSpec:
     process_accounting = accounting_label(accounting_mode)
+    cached_node = MetricSpec(
+        key="Cached",
+        label="Cached",
+        value_func=lambda snapshot, _proc: pure_page_cache_kb(snapshot),
+        description=f"纯 page cache。已从 meminfo:Cached 中扣除已计入进程占用的 ProcessFileMap({process_accounting})。",
+    )
+
     kernel_dedicated = MetricSpec(
         key="kernel_dedicated",
         label="内核专有内存",
@@ -658,11 +726,11 @@ def build_spec_root(accounting_mode: str) -> MetricSpec:
     free_reclaimable = MetricSpec(
         key="free_reclaimable",
         label="空闲与可回收",
-        description="free + cache + buffers + reclaimable slab。",
+        description="free + 纯 page cache + buffers + reclaimable slab。",
         children=[
             meminfo_leaf("MemFree", description="完全空闲页。"),
             meminfo_leaf("Buffers", description="buffer cache。"),
-            meminfo_leaf("Cached", description="page cache。"),
+            cached_node,
             meminfo_leaf("SReclaimable", description="可回收 slab。"),
         ],
     )
@@ -774,6 +842,23 @@ def print_tree(node: MetricNode, unit: str) -> None:
         print(line)
 
 
+def print_post_tree_summary(snapshot: SystemSnapshot, unit: str) -> None:
+    process_file_map = process_file_mapped_kb(snapshot)
+    pure_page_cache = pure_page_cache_kb(snapshot)
+    print()
+    print(
+        "说明: 进程 file-{} 已计入“进程占用({}汇总)”；为避免重复计算，上表 Cached 仅表示纯 page cache，"
+        "即 meminfo:Cached - 进程 file-{} = {}；当前进程 file-{} 为 {}。".format(
+            accounting_label(snapshot.accounting_mode),
+            accounting_label(snapshot.accounting_mode),
+            accounting_label(snapshot.accounting_mode),
+            format_size(pure_page_cache, unit),
+            accounting_label(snapshot.accounting_mode),
+            format_size(process_file_map, unit),
+        )
+    )
+
+
 def truncate_text(text: str, width: int) -> str:
     if len(text) <= width:
         return text
@@ -789,16 +874,9 @@ def render_process_table(snapshot: SystemSnapshot, unit: str) -> List[str]:
     stack_header = f"STACK_{suffix}"
     file_header = f"FILE_{suffix}"
     shmem_header = f"SHMEM_{suffix}"
-    has_java = any(proc.metrics.get("java_heap_kb") is not None for proc in snapshot.processes)
-    if has_java:
-        header = (
-            f"{'PID':>8}  {'COMM':<32}  {total_header:>12}  {anon_header:>12}  {stack_header:>12}  {file_header:>12}  {shmem_header:>12}  "
-            f"{'JAVA_HEAP':>12}  {'JAVA_META':>12}  {'JAVA_CODE':>12}  {'JAVA_OFFHEAP':>12}"
-        )
-    else:
-        header = (
-            f"{'PID':>8}  {'COMM':<32}  {total_header:>12}  {anon_header:>12}  {stack_header:>12}  {file_header:>12}  {shmem_header:>12}"
-        )
+    header = (
+        f"{'PID':>8}  {'COMM':<32}  {total_header:>12}  {anon_header:>12}  {stack_header:>12}  {file_header:>12}  {shmem_header:>12}"
+    )
     lines = [header, "-" * len(header)]
 
     for process in snapshot.processes:
@@ -813,19 +891,37 @@ def render_process_table(snapshot: SystemSnapshot, unit: str) -> List[str]:
             f"{format_size(process.metrics.get('file', 0), unit):>12}  "
             f"{format_size(process.metrics.get('shmem', 0), unit):>12}"
         )
-        if has_java:
-            def fmt_java(key: str) -> str:
-                val = process.metrics.get(key)
-                return format_size(val, unit) if val is not None else "-"
-
-            java_cols = (
-                f"  {fmt_java('java_heap_kb'):>12}  "
-                f"{fmt_java('java_metaspace_kb'):>12}  "
-                f"{fmt_java('java_code_cache_kb'):>12}  "
-                f"{fmt_java('java_off_heap_kb'):>12}"
-            )
-            base_line += java_cols
         lines.append(base_line)
+
+        java_used_pairs = [
+            ("heap", process.metrics.get("java_heap_used_kb")),
+            ("meta", process.metrics.get("java_metaspace_used_kb")),
+            ("class", process.metrics.get("java_class_space_used_kb")),
+            ("code", process.metrics.get("java_code_cache_used_kb")),
+        ]
+        java_used_items = [
+            f"{label}={format_size(value, unit)}"
+            for label, value in java_used_pairs
+            if value is not None
+        ]
+        if java_used_items:
+            lines.append(f"{'':>8}  {'└─ JVM used: ' + '  '.join(java_used_items)}")
+
+        java_native_pairs = [
+            ("gc(commit)", process.metrics.get("java_gc_committed_kb")),
+            ("thread(commit)", process.metrics.get("java_thread_committed_kb")),
+            ("other(commit)", process.metrics.get("java_other_committed_kb")),
+            ("symbol(commit)", process.metrics.get("java_symbol_committed_kb")),
+            ("internal(commit)", process.metrics.get("java_internal_committed_kb")),
+            ("compiler(commit)", process.metrics.get("java_compiler_committed_kb")),
+        ]
+        java_native_items = [
+            f"{label}={format_size(value, unit)}"
+            for label, value in java_native_pairs
+            if value is not None and value > 0
+        ]
+        if java_native_items:
+            lines.append(f"{'':>8}  {'└─ JVM runtime/native: ' + '  '.join(java_native_items)}")
 
     return lines
 
@@ -960,6 +1056,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print()
     else:
         print_tree(root_node, args.unit)
+        print_post_tree_summary(snapshot, args.unit)
         show_processes = args.all or args.processes
         show_modules = args.all or args.modules
         show_slabs = args.all or args.slabs
