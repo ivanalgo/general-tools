@@ -9,13 +9,14 @@
 3. 新增数据来源时，只需要补一个 reader / resolver，或者补一个定义表项。
 4. 同时提供：
    - 系统视角：内核专有内存、空闲/可回收内存。
-    - 进程视角：列出所有进程，每进程一行输出 total / anon / stack / file / shmem。
+   - 进程视角：列出所有进程，每进程一行输出 total / anon / stack / file / shmem；Java进程额外缩进显示 JVM used 细分。
    - 内核模块视角：列出所有内核模块，每模块一行输出占用大小。
    - slab 视角：列出所有 slab cache，每 cache 一行输出占用大小。
 
 说明：
-- 进程维度的总量使用 RSS 视角，shared 页在多进程汇总时可能重复计数。
-- stack / heap 的细分来自 /proc/<pid>/smaps，对不可读进程会自动降级为 0。
+- 默认进程维度的总量使用 PSS 视角，shared 页会在多进程之间按比例分摊；可通过参数切换回 RSS。
+- 为兼顾准确性与性能，total / anon / file / shmem 优先来自 /proc/<pid>/smaps_rollup，stack / heap 的细分来自 /proc/<pid>/smaps。
+- Java进程内存细分通过jcmd获取，需JDK环境支持。
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import unicodedata
 from dataclasses import dataclass, field
@@ -35,6 +38,7 @@ MEMINFO_PATH = "/proc/meminfo"
 SMAPS_HEADER_RE = re.compile(r"^[0-9a-fA-F]+-[0-9a-fA-F]+\s")
 PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 SLAB_SYSFS_ROOT = "/sys/kernel/slab"
+JCMD_PATH = shutil.which("jcmd")
 
 
 def clamp_non_negative(value: int) -> int:
@@ -88,14 +92,16 @@ def parse_cmdline(path: str) -> str:
         return ""
 
 
-def parse_smaps_categories(path: str) -> Dict[str, int]:
+def parse_smaps_vma_categories(path: str, value_key: str) -> Dict[str, int]:
     """
     只做最需要的 anon 子类细分：stack / heap。
+    value_key 可取 Rss / Pss。
     其余 anon 统一通过 anon_total - stack - heap 推导。
     """
-    stack_rss = 0
-    heap_rss = 0
+    stack_kb = 0
+    heap_kb = 0
     current_name = ""
+    target_prefix = f"{value_key}:"
 
     with open(path, "r", encoding="utf-8", errors="replace") as file_obj:
         for line in file_obj:
@@ -104,7 +110,7 @@ def parse_smaps_categories(path: str) -> Dict[str, int]:
                 current_name = parts[5] if len(parts) >= 6 else ""
                 continue
 
-            if not line.startswith("Rss:"):
+            if not line.startswith(target_prefix):
                 continue
 
             pieces = line.split()
@@ -112,19 +118,156 @@ def parse_smaps_categories(path: str) -> Dict[str, int]:
                 continue
 
             try:
-                rss_kb = int(pieces[1])
+                value_kb = int(pieces[1])
             except ValueError:
                 continue
 
             if current_name.startswith("[stack"):
-                stack_rss += rss_kb
+                stack_kb += value_kb
             elif current_name == "[heap]":
-                heap_rss += rss_kb
+                heap_kb += value_kb
 
     return {
-        "rss_stack": stack_rss,
-        "rss_heap": heap_rss,
+        "stack": stack_kb,
+        "heap": heap_kb,
     }
+
+
+def parse_smaps_rollup_pss(path: str) -> Dict[str, int]:
+    data = parse_status_file(path)
+    metrics: Dict[str, int] = {}
+
+    for source_key, target_key in (
+        ("Pss", "total_kb"),
+        ("Pss_Anon", "anon"),
+        ("Pss_File", "file"),
+        ("Pss_Shmem", "shmem"),
+    ):
+        value = data.get(source_key)
+        if isinstance(value, int):
+            metrics[target_key] = clamp_non_negative(value)
+
+    return metrics
+
+
+def accounting_label(accounting_mode: str) -> str:
+    return "PSS" if accounting_mode == "pss" else "RSS"
+
+
+def process_file_mapped_kb(snapshot: "SystemSnapshot") -> int:
+    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    process_file_total = sum(clamp_non_negative(proc.metrics.get("file", 0)) for proc in snapshot.processes)
+    return min(process_file_total, cached_total)
+
+
+def pure_page_cache_kb(snapshot: "SystemSnapshot") -> int:
+    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    return clamp_non_negative(cached_total - process_file_mapped_kb(snapshot))
+
+
+def get_java_memory_metrics(pid: int) -> Dict[str, int]:
+    """
+    尝试通过jcmd获取Java进程内存细分指标，返回单位为KB的字典。
+    输出以 used 为主，便于反映 JVM 内部实际使用量：
+    - heap/metaspace/class space 来自 GC.heap_info
+    - code cache used 来自 Compiler.codecache
+    - native committed 仅作为补充字段保留，用于解释 PSS 与 JVM used 的差异
+    """
+    if JCMD_PATH is None:
+        return {}
+
+    metrics: Dict[str, int] = {}
+
+    try:
+        result = subprocess.run(
+            [JCMD_PATH, str(pid), "GC.heap_info"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            output = result.stdout
+            heap_match = re.search(r"heap\s+total\s+\d+K,\s*used\s+(\d+)K", output)
+            if heap_match:
+                metrics["java_heap_used_kb"] = int(heap_match.group(1))
+
+            metaspace_used_match = re.search(r"Metaspace\s+used\s+(\d+)K", output)
+            class_space_used = None
+            metaspace_used = None
+            if metaspace_used_match:
+                metaspace_used = int(metaspace_used_match.group(1))
+
+            class_space_used_match = re.search(r"class space\s+used\s+(\d+)K", output)
+            if class_space_used_match:
+                class_space_used = int(class_space_used_match.group(1))
+                metrics["java_class_space_used_kb"] = class_space_used
+
+            if metaspace_used is not None:
+                if class_space_used is not None:
+                    metrics["java_metaspace_used_kb"] = max(metaspace_used - class_space_used, 0)
+                else:
+                    metrics["java_metaspace_used_kb"] = metaspace_used
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
+
+    try:
+        result = subprocess.run(
+            [JCMD_PATH, str(pid), "Compiler.codecache"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            code_used_total = 0
+            for match in re.finditer(r"^CodeHeap '.*?': size=\d+Kb used=(\d+)Kb ", result.stdout, re.MULTILINE):
+                code_used_total += int(match.group(1))
+            if code_used_total > 0:
+                metrics["java_code_cache_used_kb"] = code_used_total
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
+
+    try:
+        result = subprocess.run(
+            [JCMD_PATH, str(pid), "VM.native_memory", "summary"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            output = result.stdout
+            heap_match = re.search(r"Java Heap\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)", output)
+            total_match = re.search(r"Total:\s+reserved=\d+KB,\s*committed=(\d+)KB", output)
+            if total_match and heap_match:
+                total_committed = int(total_match.group(1))
+                heap_committed = int(heap_match.group(1))
+                metrics["java_native_committed_kb"] = max(total_committed - heap_committed, 0)
+
+            nmt_category_patterns = {
+                "java_thread_committed_kb": r"-\s+Thread\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_gc_committed_kb": r"-\s+GC\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_other_committed_kb": r"-\s+Other\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_symbol_committed_kb": r"-\s+Symbol\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_internal_committed_kb": r"-\s+Internal\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_compiler_committed_kb": r"-\s+Compiler\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_nmt_committed_kb": r"-\s+Native Memory Tracking\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_arena_chunk_committed_kb": r"-\s+Arena Chunk\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_logging_committed_kb": r"-\s+Logging\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_arguments_committed_kb": r"-\s+Arguments\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_module_committed_kb": r"-\s+Module\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_synchronizer_committed_kb": r"-\s+Synchronizer\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+                "java_safepoint_committed_kb": r"-\s+Safepoint\s+\(reserved=\d+KB,\s*committed=(\d+)KB\)",
+            }
+            for key, pattern in nmt_category_patterns.items():
+                match = re.search(pattern, output)
+                if match:
+                    metrics[key] = int(match.group(1))
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
+
+    return metrics
 
 
 def parse_proc_modules(path: str = "/proc/modules") -> List[Dict[str, object]]:
@@ -224,6 +367,7 @@ class ProcessSnapshot:
     name: str
     command: str
     metrics: Dict[str, int]
+    accounting_mode: str = "rss"
 
     @property
     def display_name(self) -> str:
@@ -231,8 +375,8 @@ class ProcessSnapshot:
         return f"{base} [{self.pid}]"
 
     @property
-    def total_rss(self) -> int:
-        return self.metrics.get("rss_total", 0)
+    def total_kb(self) -> int:
+        return self.metrics.get("total_kb", self.metrics.get("rss_total", 0))
 
     def to_row_dict(self) -> Dict[str, object]:
         return {
@@ -240,11 +384,23 @@ class ProcessSnapshot:
             "name": self.name,
             "command": self.command,
             "display_name": self.display_name,
-            "total_kb": self.total_rss,
+            "accounting_mode": self.accounting_mode,
+            "total_kb": self.total_kb,
             "anon_kb": self.metrics.get("anon", 0),
             "stack_kb": self.metrics.get("stack", 0),
             "file_kb": self.metrics.get("file", 0),
             "shmem_kb": self.metrics.get("shmem", 0),
+            "java_heap_used_kb": self.metrics.get("java_heap_used_kb"),
+            "java_metaspace_used_kb": self.metrics.get("java_metaspace_used_kb"),
+            "java_class_space_used_kb": self.metrics.get("java_class_space_used_kb"),
+            "java_code_cache_used_kb": self.metrics.get("java_code_cache_used_kb"),
+            "java_native_committed_kb": self.metrics.get("java_native_committed_kb"),
+            "java_gc_committed_kb": self.metrics.get("java_gc_committed_kb"),
+            "java_thread_committed_kb": self.metrics.get("java_thread_committed_kb"),
+            "java_other_committed_kb": self.metrics.get("java_other_committed_kb"),
+            "java_symbol_committed_kb": self.metrics.get("java_symbol_committed_kb"),
+            "java_internal_committed_kb": self.metrics.get("java_internal_committed_kb"),
+            "java_compiler_committed_kb": self.metrics.get("java_compiler_committed_kb"),
         }
 
 
@@ -254,6 +410,7 @@ class SystemSnapshot:
     processes: List[ProcessSnapshot]
     modules: List[Dict[str, object]]
     slabs: List[Dict[str, object]]
+    accounting_mode: str = "rss"
     notes: List[str] = field(default_factory=list)
 
 
@@ -378,18 +535,19 @@ def build_process_metric_specs(snapshot: SystemSnapshot, _process: Optional[Proc
         MetricSpec(
             key=f"process_{proc.pid}",
             label=proc.display_name,
-            value_func=lambda _snapshot, _proc, proc=proc: proc.total_rss,
-            description="单个进程的 RSS。",
+            value_func=lambda _snapshot, _proc, proc=proc: proc.total_kb,
+            description=f"单个进程的 {accounting_label(proc.accounting_mode)}。",
         )
         for proc in snapshot.processes
     ]
 
 
-def read_single_process(pid: int, include_smaps: bool = True) -> Optional[ProcessSnapshot]:
+def read_single_process(pid: int, include_smaps: bool = True, accounting_mode: str = "pss") -> Optional[ProcessSnapshot]:
     proc_dir = os.path.join(PROC_ROOT, str(pid))
     status_path = os.path.join(proc_dir, "status")
     cmdline_path = os.path.join(proc_dir, "cmdline")
     smaps_path = os.path.join(proc_dir, "smaps")
+    smaps_rollup_path = os.path.join(proc_dir, "smaps_rollup")
 
     try:
         status = parse_status_file(status_path)
@@ -406,6 +564,7 @@ def read_single_process(pid: int, include_smaps: bool = True) -> Optional[Proces
 
     metrics = {
         "rss_total": rss_total,
+        "total_kb": rss_total,
         "anon": rss_anon,
         "file": rss_file,
         "shmem": rss_shmem,
@@ -417,41 +576,67 @@ def read_single_process(pid: int, include_smaps: bool = True) -> Optional[Proces
         "hugetlb": clamp_non_negative(int(status.get("HugetlbPages", 0))),
     }
 
-    if include_smaps:
+    detail_value_key = "Rss"
+
+    if accounting_mode == "pss":
         try:
-            smaps = parse_smaps_categories(smaps_path)
-            stack_rss = min(clamp_non_negative(smaps.get("rss_stack", 0)), rss_anon)
-            heap_rss = min(clamp_non_negative(smaps.get("rss_heap", 0)), max(rss_anon - stack_rss, 0))
-            metrics["stack"] = stack_rss
-            metrics["heap"] = heap_rss
-            metrics["other_anon"] = max(rss_anon - stack_rss - heap_rss, 0)
+            rollup_metrics = parse_smaps_rollup_pss(smaps_rollup_path)
+            required_keys = {"total_kb", "anon", "file", "shmem"}
+            if required_keys.issubset(rollup_metrics):
+                metrics.update({key: rollup_metrics[key] for key in required_keys})
+                detail_value_key = "Pss"
         except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
             pass
 
-    return ProcessSnapshot(pid=pid, name=name, command=command, metrics=metrics)
+    if include_smaps:
+        try:
+            smaps = parse_smaps_vma_categories(smaps_path, detail_value_key)
+            stack_kb = min(clamp_non_negative(smaps.get("stack", 0)), metrics["anon"])
+            heap_kb = min(clamp_non_negative(smaps.get("heap", 0)), max(metrics["anon"] - stack_kb, 0))
+            metrics["stack"] = stack_kb
+            metrics["heap"] = heap_kb
+            metrics["other_anon"] = max(metrics["anon"] - stack_kb - heap_kb, 0)
+        except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
+            pass
+    else:
+        metrics["other_anon"] = metrics["anon"]
+
+    if name == "java" or "java" in command.lower():
+        java_metrics = get_java_memory_metrics(pid)
+        metrics.update(java_metrics)
+
+    return ProcessSnapshot(pid=pid, name=name, command=command, metrics=metrics, accounting_mode=accounting_mode)
 
 
-def collect_processes(include_smaps: bool = True, include_zero_process: bool = False) -> List[ProcessSnapshot]:
+def collect_processes(
+    include_smaps: bool = True,
+    include_zero_process: bool = False,
+    accounting_mode: str = "pss",
+) -> List[ProcessSnapshot]:
     processes: List[ProcessSnapshot] = []
 
     for entry in os.listdir(PROC_ROOT):
         if not entry.isdigit():
             continue
 
-        process = read_single_process(int(entry), include_smaps=include_smaps)
+        process = read_single_process(int(entry), include_smaps=include_smaps, accounting_mode=accounting_mode)
         if process is None:
             continue
 
-        if not include_zero_process and process.total_rss == 0:
+        if not include_zero_process and process.total_kb == 0:
             continue
 
         processes.append(process)
 
-    processes.sort(key=lambda proc: (-proc.total_rss, proc.pid))
+    processes.sort(key=lambda proc: (-proc.total_kb, proc.pid))
     return processes
 
 
-def collect_snapshot(include_smaps: bool = True, include_zero_process: bool = False) -> SystemSnapshot:
+def collect_snapshot(
+    include_smaps: bool = True,
+    include_zero_process: bool = False,
+    accounting_mode: str = "pss",
+) -> SystemSnapshot:
     notes: List[str] = []
     meminfo = parse_meminfo()
     try:
@@ -470,18 +655,53 @@ def collect_snapshot(include_smaps: bool = True, include_zero_process: bool = Fa
         slabs = []
         notes.append("无法读取 /proc/slabinfo，slab 明细将为空。")
 
-    if include_smaps:
-        notes.append("进程 anon/stack/heap 细分使用 /proc/<pid>/smaps，权限不足时会自动退化。")
+    if accounting_mode == "pss":
+        notes.append("进程 total/anon/file/shmem 默认使用 PSS 口径，优先读取 /proc/<pid>/smaps_rollup 中的 Pss/Pss_Anon/Pss_File/Pss_Shmem，以避免跨进程共享页重复计数；无法读取时会按进程退化为 RSS。")
+        if include_smaps:
+            notes.append("PSS 模式下仅为 [heap]/[stack] 细分扫描 /proc/<pid>/smaps 的 Pss 字段，以兼顾准确性与性能。")
+        else:
+            notes.append("已禁用 smaps，PSS 模式下 stack/heap 细分将为 0；但 total/anon/file/shmem 仍会优先读取 smaps_rollup。")
     else:
-        notes.append("已禁用 smaps，进程 anon 细分中的 stack/heap 将为 0。")
+        notes.append("进程 total/anon/file/shmem 使用 RSS 口径；shared 页在多进程求和时可能重复计数。")
+        if include_smaps:
+            notes.append("RSS 模式下 [heap]/[stack] 细分使用 /proc/<pid>/smaps 的 Rss 字段。")
+        else:
+            notes.append("已禁用 smaps，RSS 模式下 stack/heap 细分将为 0。")
 
-    processes = collect_processes(include_smaps=include_smaps, include_zero_process=include_zero_process)
-    notes.append("进程总量为 RSS 汇总视角，shared 页在多进程求和时可能重复计数。")
+    if JCMD_PATH is not None:
+        notes.append("Java进程内存细分通过jcmd获取：主表缩进展示 JVM used（heap/meta/class/code）；若开启 -XX:NativeMemoryTracking=summary，还会额外展示 JVM runtime/native committed（如 GC/thread/other），用于解释 PSS 与 JVM used 的差异。")
+    else:
+        notes.append("未检测到jcmd命令，Java进程内存细分功能不可用。")
 
-    return SystemSnapshot(meminfo=meminfo, processes=processes, modules=modules, slabs=slabs, notes=notes)
+    notes.append(
+        f"为避免与进程占用重复计算，树中的 Cached 已改为纯 page cache；其中纯 page cache = meminfo:Cached - 进程 file-map({accounting_label(accounting_mode)}) 汇总。"
+    )
+
+    processes = collect_processes(
+        include_smaps=include_smaps,
+        include_zero_process=include_zero_process,
+        accounting_mode=accounting_mode,
+    )
+
+    return SystemSnapshot(
+        meminfo=meminfo,
+        processes=processes,
+        modules=modules,
+        slabs=slabs,
+        accounting_mode=accounting_mode,
+        notes=notes,
+    )
 
 
-def build_spec_root() -> MetricSpec:
+def build_spec_root(accounting_mode: str) -> MetricSpec:
+    process_accounting = accounting_label(accounting_mode)
+    cached_node = MetricSpec(
+        key="Cached",
+        label="Cached",
+        value_func=lambda snapshot, _proc: pure_page_cache_kb(snapshot),
+        description=f"纯 page cache。已从 meminfo:Cached 中扣除已计入进程占用的 ProcessFileMap({process_accounting})。",
+    )
+
     kernel_dedicated = MetricSpec(
         key="kernel_dedicated",
         label="内核专有内存",
@@ -506,21 +726,24 @@ def build_spec_root() -> MetricSpec:
     free_reclaimable = MetricSpec(
         key="free_reclaimable",
         label="空闲与可回收",
-        description="free + cache + buffers + reclaimable slab。",
+        description="free + 纯 page cache + buffers + reclaimable slab。",
         children=[
             meminfo_leaf("MemFree", description="完全空闲页。"),
             meminfo_leaf("Buffers", description="buffer cache。"),
-            meminfo_leaf("Cached", description="page cache。"),
+            cached_node,
             meminfo_leaf("SReclaimable", description="可回收 slab。"),
         ],
     )
 
     processes = MetricSpec(
         key="processes",
-        label="进程占用(RSS汇总)",
-        value_func=lambda snapshot, _proc: sum(proc.total_rss for proc in snapshot.processes),
-        children_sum_func=lambda snapshot, _proc: sum(proc.total_rss for proc in snapshot.processes),
-        description="数值为所有进程 RSS 汇总；子项合计同样为逐进程 RSS 加总，进程明细以表格方式单独输出，shared 页跨进程可能重复计数。",
+        label=f"进程占用({process_accounting}汇总)",
+        value_func=lambda snapshot, _proc: sum(proc.total_kb for proc in snapshot.processes),
+        children_sum_func=lambda snapshot, _proc: sum(proc.total_kb for proc in snapshot.processes),
+        description=(
+            f"数值为所有进程 {process_accounting} 汇总；子项合计同样为逐进程 {process_accounting} 加总。"
+            + ("PSS 会对共享页按 mapcount 比例分摊。" if accounting_mode == "pss" else "RSS 在跨进程求和时可能重复计数共享页。")
+        ),
     )
 
     return MetricSpec(
@@ -619,6 +842,23 @@ def print_tree(node: MetricNode, unit: str) -> None:
         print(line)
 
 
+def print_post_tree_summary(snapshot: SystemSnapshot, unit: str) -> None:
+    process_file_map = process_file_mapped_kb(snapshot)
+    pure_page_cache = pure_page_cache_kb(snapshot)
+    print()
+    print(
+        "说明: 进程 file-{} 已计入“进程占用({}汇总)”；为避免重复计算，上表 Cached 仅表示纯 page cache，"
+        "即 meminfo:Cached - 进程 file-{} = {}；当前进程 file-{} 为 {}。".format(
+            accounting_label(snapshot.accounting_mode),
+            accounting_label(snapshot.accounting_mode),
+            accounting_label(snapshot.accounting_mode),
+            format_size(pure_page_cache, unit),
+            accounting_label(snapshot.accounting_mode),
+            format_size(process_file_map, unit),
+        )
+    )
+
+
 def truncate_text(text: str, width: int) -> str:
     if len(text) <= width:
         return text
@@ -628,29 +868,66 @@ def truncate_text(text: str, width: int) -> str:
 
 
 def render_process_table(snapshot: SystemSnapshot, unit: str) -> List[str]:
+    suffix = accounting_label(snapshot.accounting_mode)
+    total_header = f"TOTAL_{suffix}"
+    anon_header = f"ANON_{suffix}"
+    stack_header = f"STACK_{suffix}"
+    file_header = f"FILE_{suffix}"
+    shmem_header = f"SHMEM_{suffix}"
     header = (
-        f"{'PID':>8}  {'COMM':<32}  {'TOTAL':>12}  {'ANON':>12}  {'STACK':>12}  {'FILE':>12}  {'SHMEM':>12}"
+        f"{'PID':>8}  {'COMM':<32}  {total_header:>12}  {anon_header:>12}  {stack_header:>12}  {file_header:>12}  {shmem_header:>12}"
     )
     lines = [header, "-" * len(header)]
 
     for process in snapshot.processes:
         name = process.command if process.command else process.name
         name = truncate_text(name, 32)
-        lines.append(
+        base_line = (
             f"{process.pid:>8}  "
             f"{name:<32}  "
-            f"{format_size(process.total_rss, unit):>12}  "
+            f"{format_size(process.total_kb, unit):>12}  "
             f"{format_size(process.metrics.get('anon', 0), unit):>12}  "
             f"{format_size(process.metrics.get('stack', 0), unit):>12}  "
             f"{format_size(process.metrics.get('file', 0), unit):>12}  "
             f"{format_size(process.metrics.get('shmem', 0), unit):>12}"
         )
+        lines.append(base_line)
+
+        java_used_pairs = [
+            ("heap", process.metrics.get("java_heap_used_kb")),
+            ("meta", process.metrics.get("java_metaspace_used_kb")),
+            ("class", process.metrics.get("java_class_space_used_kb")),
+            ("code", process.metrics.get("java_code_cache_used_kb")),
+        ]
+        java_used_items = [
+            f"{label}={format_size(value, unit)}"
+            for label, value in java_used_pairs
+            if value is not None
+        ]
+        if java_used_items:
+            lines.append(f"{'':>8}  {'└─ JVM used: ' + '  '.join(java_used_items)}")
+
+        java_native_pairs = [
+            ("gc(commit)", process.metrics.get("java_gc_committed_kb")),
+            ("thread(commit)", process.metrics.get("java_thread_committed_kb")),
+            ("other(commit)", process.metrics.get("java_other_committed_kb")),
+            ("symbol(commit)", process.metrics.get("java_symbol_committed_kb")),
+            ("internal(commit)", process.metrics.get("java_internal_committed_kb")),
+            ("compiler(commit)", process.metrics.get("java_compiler_committed_kb")),
+        ]
+        java_native_items = [
+            f"{label}={format_size(value, unit)}"
+            for label, value in java_native_pairs
+            if value is not None and value > 0
+        ]
+        if java_native_items:
+            lines.append(f"{'':>8}  {'└─ JVM runtime/native: ' + '  '.join(java_native_items)}")
 
     return lines
 
 
 def print_process_table(snapshot: SystemSnapshot, unit: str) -> None:
-    print("\n进程明细(每进程一行):")
+    print(f"\n进程明细(每进程一行, {accounting_label(snapshot.accounting_mode)}口径):")
     for line in render_process_table(snapshot, unit):
         print(line)
 
@@ -703,6 +980,12 @@ def print_slab_table(snapshot: SystemSnapshot, unit: str) -> None:
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="结构化输出机器内存 topdown 分解")
     parser.add_argument(
+        "--accounting",
+        choices=["pss", "rss"],
+        default="pss",
+        help="进程内存核算口径：pss(默认，适合整机汇总) 或 rss(适合看单进程resident)",
+    )
+    parser.add_argument(
         "--unit",
         choices=["kb", "mb", "gb"],
         default="mb",
@@ -716,12 +999,12 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-smaps",
         action="store_true",
-        help="不读取 /proc/<pid>/smaps，进程 anon 下的 stack/heap 细分将不可用",
+        help="不读取 /proc/<pid>/smaps；stack/heap 细分将不可用，pss 模式下 total/anon/file/shmem 仍会优先读取 smaps_rollup",
     )
     parser.add_argument(
         "--show-zero-processes",
         action="store_true",
-        help="是否显示 RSS 为 0 的进程",
+        help="是否显示当前核算口径下 total 为 0 的进程",
     )
     parser.add_argument(
         "-p",
@@ -755,12 +1038,14 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     snapshot = collect_snapshot(
         include_smaps=not args.no_smaps,
         include_zero_process=args.show_zero_processes,
+        accounting_mode=args.accounting,
     )
-    root_spec = build_spec_root()
+    root_spec = build_spec_root(snapshot.accounting_mode)
     root_node = build_metric_tree(root_spec, snapshot)
 
     if args.json:
         payload = {
+            "accounting_mode": snapshot.accounting_mode,
             "notes": snapshot.notes,
             "tree": root_node.to_dict(),
             "processes": [process.to_row_dict() for process in snapshot.processes],
@@ -771,6 +1056,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print()
     else:
         print_tree(root_node, args.unit)
+        print_post_tree_summary(snapshot, args.unit)
         show_processes = args.all or args.processes
         show_modules = args.all or args.modules
         show_slabs = args.all or args.slabs
