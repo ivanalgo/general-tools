@@ -156,13 +156,35 @@ def accounting_label(accounting_mode: str) -> str:
 
 def process_file_mapped_kb(snapshot: "SystemSnapshot") -> int:
     cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    shmem_total = clamp_non_negative(snapshot.meminfo.get("Shmem", 0))
+    file_cache_total = clamp_non_negative(cached_total - shmem_total)
     process_file_total = sum(clamp_non_negative(proc.metrics.get("file", 0)) for proc in snapshot.processes)
-    return min(process_file_total, cached_total)
+    return min(process_file_total, file_cache_total)
+
+
+def process_shmem_mapped_kb(snapshot: "SystemSnapshot") -> int:
+    shmem_total = clamp_non_negative(snapshot.meminfo.get("Shmem", 0))
+    process_shmem_total = sum(clamp_non_negative(proc.metrics.get("shmem", 0)) for proc in snapshot.processes)
+    return min(process_shmem_total, shmem_total)
+
+
+def file_cache_total_kb(snapshot: "SystemSnapshot") -> int:
+    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
+    shmem_total = clamp_non_negative(snapshot.meminfo.get("Shmem", 0))
+    return clamp_non_negative(cached_total - shmem_total)
+
+
+def shmem_total_kb(snapshot: "SystemSnapshot") -> int:
+    return clamp_non_negative(snapshot.meminfo.get("Shmem", 0))
 
 
 def pure_page_cache_kb(snapshot: "SystemSnapshot") -> int:
-    cached_total = clamp_non_negative(snapshot.meminfo.get("Cached", 0))
-    return clamp_non_negative(cached_total - process_file_mapped_kb(snapshot))
+    return clamp_non_negative(file_cache_total_kb(snapshot) - process_file_mapped_kb(snapshot))
+
+
+def pure_shmem_kb(snapshot: "SystemSnapshot") -> int:
+    shmem_total = clamp_non_negative(snapshot.meminfo.get("Shmem", 0))
+    return clamp_non_negative(shmem_total - process_shmem_mapped_kb(snapshot))
 
 
 def get_java_memory_metrics(pid: int) -> Dict[str, int]:
@@ -674,7 +696,10 @@ def collect_snapshot(
         notes.append("未检测到jcmd命令，Java进程内存细分功能不可用。")
 
     notes.append(
-        f"为避免与进程占用重复计算，树中的 Cached 已改为纯 page cache；其中纯 page cache = meminfo:Cached - 进程 file-map({accounting_label(accounting_mode)}) 汇总。"
+        f"meminfo:Cached 在内核中包含 shmem/tmpfs 页。树中的 Cached 只记 PureCache；其下额外展示 ProcessFileMap({accounting_label(accounting_mode)}) 与 Shmem 作为说明性子项，但二者不计入 Cached 总结。"
+    )
+    notes.append(
+        f"树中新增独立的公共内存/Shmem 分类，表示未归因给进程的 shmem/tmpfs；其中纯 shmem = meminfo:Shmem - 进程 shmem({accounting_label(accounting_mode)}) 汇总。"
     )
 
     processes = collect_processes(
@@ -699,7 +724,45 @@ def build_spec_root(accounting_mode: str) -> MetricSpec:
         key="Cached",
         label="Cached",
         value_func=lambda snapshot, _proc: pure_page_cache_kb(snapshot),
-        description=f"纯 page cache。已从 meminfo:Cached 中扣除已计入进程占用的 ProcessFileMap({process_accounting})。",
+        description=(
+            "Cached 在本树中仅记不与其他顶层项重复的 PureCache。"
+            f"其下额外展示 ProcessFileMap({process_accounting}) 与 Shmem 作为说明性子项，但它们不计入 Cached 数值/总结。"
+        ),
+        children_sum_func=lambda snapshot, _proc: pure_page_cache_kb(snapshot),
+        children=[
+            MetricSpec(
+                key="ProcessFileMap",
+                label="ProcessFileMap",
+                value_func=lambda snapshot, _proc: process_file_mapped_kb(snapshot),
+                description=f"已映射到进程并计入进程占用的文件页缓存({process_accounting})；仅作说明，不计入 Cached 总结。",
+            ),
+            MetricSpec(
+                key="PureCache",
+                label="PureCache",
+                value_func=lambda snapshot, _proc: pure_page_cache_kb(snapshot),
+                description="未归因到进程 file-map 的纯文件页缓存；这是 Cached 实际计入的部分。",
+            ),
+            MetricSpec(
+                key="ShmemOverlap",
+                label="Shmem",
+                value_func=lambda snapshot, _proc: pure_shmem_kb(snapshot),
+                description="与顶层公共内存中的 Shmem 对应；仅作说明，不计入 Cached 总结。",
+            ),
+        ],
+    )
+
+    shmem_node = MetricSpec(
+        key="Shmem",
+        label="Shmem",
+        value_func=lambda snapshot, _proc: pure_shmem_kb(snapshot),
+        description=f"纯 shmem/tmpfs。已从 meminfo:Shmem 中扣除已计入进程占用的 ProcessShmem({process_accounting})。",
+    )
+
+    shared_memory = MetricSpec(
+        key="shared_memory",
+        label="公共内存",
+        description="与空闲/可回收内存平行的独立分类，这里当前只承载 shmem/tmpfs。",
+        children=[shmem_node],
     )
 
     kernel_dedicated = MetricSpec(
@@ -751,7 +814,7 @@ def build_spec_root(accounting_mode: str) -> MetricSpec:
         label="MemTotal",
         source=SourceRef("meminfo", "MemTotal"),
         description="系统物理内存总量。下面同时给出系统视角与进程视角。",
-        children=[kernel_dedicated, processes, free_reclaimable],
+        children=[kernel_dedicated, processes, shared_memory, free_reclaimable],
     )
 
 
@@ -845,18 +908,33 @@ def print_tree(node: MetricNode, unit: str) -> None:
 def print_post_tree_summary(snapshot: SystemSnapshot, unit: str) -> None:
     process_file_map = process_file_mapped_kb(snapshot)
     pure_page_cache = pure_page_cache_kb(snapshot)
+    shmem_total = shmem_total_kb(snapshot)
+    pure_shmem = pure_shmem_kb(snapshot)
+    process_shmem_map = process_shmem_mapped_kb(snapshot)
     print()
+    print("说明:")
+    print("- meminfo:Cached 包含 shmem/tmpfs。")
+    print("- 上表 Cached 在本树中只记 PureCache = {}。".format(format_size(pure_page_cache, unit)))
     print(
-        "说明: 进程 file-{} 已计入“进程占用({}汇总)”；为避免重复计算，上表 Cached 仅表示纯 page cache，"
-        "即 meminfo:Cached - 进程 file-{} = {}；当前进程 file-{} 为 {}。".format(
-            accounting_label(snapshot.accounting_mode),
-            accounting_label(snapshot.accounting_mode),
-            accounting_label(snapshot.accounting_mode),
-            format_size(pure_page_cache, unit),
+        "- Cached 下额外展示 ProcessFileMap(file-{}) = {}，仅作说明，不计入 Cached 总结。".format(
             accounting_label(snapshot.accounting_mode),
             format_size(process_file_map, unit),
         )
     )
+    print("- Cached 下额外展示 Shmem = {}，仅作说明，不计入 Cached 总结。".format(format_size(pure_shmem, unit)))
+    print(
+        "- 顶层公共内存/Shmem 表示未归因给进程的 shmem/tmpfs = meminfo:Shmem - 进程 shmem-{} = {}。".format(
+            accounting_label(snapshot.accounting_mode),
+            format_size(pure_shmem, unit),
+        )
+    )
+    print(
+        "- 当前进程 shmem-{} 为 {}。".format(
+            accounting_label(snapshot.accounting_mode),
+            format_size(process_shmem_map, unit),
+        )
+    )
+    print("- meminfo:Shmem 总量为 {}。".format(format_size(shmem_total, unit)))
 
 
 def truncate_text(text: str, width: int) -> str:
