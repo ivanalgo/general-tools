@@ -1,6 +1,6 @@
 ---
 name: computer-tech-tutorial-writer
-description: 当需要编写、审阅、重构或配图讲解计算机技术教程时使用，尤其适合 AI Infra、分布式系统、LLM 训练、CCL/NCCL、数据库、操作系统、网络、编译器、存储、性能优化等抽象度高的主题。该技能强调从基本计算结构讲起，先讲单机/单卡，再讲分布式；明确说明切分对象、状态归属、数据流动和同步点，并用渐进式图示降低理解成本。
+description: 当需要编写、审阅、重构或配图讲解计算机技术教程时使用，尤其适合 AI Infra、分布式系统、LLM 训练、CCL/NCCL、数据库、操作系统、网络、编译器、存储、性能优化、CXL/PCIe/NVMe/RDMA/GPU Direct 等硬件互联与跨设备访问主题。该技能强调从基本计算结构讲起，先讲单机/单卡，再讲分布式；明确说明切分对象、状态归属、数据流动、transaction path 和同步点，并用渐进式图示降低理解成本。
 ---
 
 # 计算机技术教程写作
@@ -239,6 +239,42 @@ partial result
 index entry
 ```
 
+### 跨设备访问必须讲清 transaction path
+
+涉及硬件互联、设备访问、DMA、CXL、PCIe、RDMA、NVMe、GPU Direct、SSD over fabric、memory mapped、load/store、cache coherent、zero-copy 等主题时，不要只写“A 直接访问 B”或“数据通过某协议传输”。必须把一次真实操作拆开讲清楚：
+
+```text
+谁发起操作：
+操作发给谁：
+命令进入哪个 queue / doorbell / descriptor：
+源数据的语义对象是什么：
+源数据的物理位置在哪里：
+目标地址是什么：
+谁是真正搬数据的 agent / DMA master：
+经过哪些物理链路和中间设备：
+completion / ordering / error 如何返回：
+fallback 路径是什么：
+```
+
+尤其要区分四层，不要跨层偷换概念：
+
+```text
+语义层：文件、对象、chunk、page、cache line
+控制层：open/read/cuFile/queue submission/metadata lookup
+地址层：VA/PA/IOVA/BAR/HBM address/CXL range
+物理层：PCIe lane、switch、root complex、NIC、CXL fabric
+```
+
+例如不要只写“SSD 数据直接进入 GPU HBM”。应展开为：CPU runtime 发起 I/O；文件系统解析 file offset 到 extent；driver/runtime 把源 extent、目标 GPU buffer、长度描述成 DMA 操作；NVMe controller / NIC / fabric endpoint 作为 DMA master；数据沿 PCIe / PCIe switch / RDMA / CXL fabric 写入 GPU 可寻址窗口；completion 返回 CPU runtime 或 GPU stream。
+
+### 先讲工作过程，再讲收益和不足
+
+对新硬件方案或新系统形态，先解释一次 read / write / cache miss / page fault / failure recovery 如何发生，再总结收益和不足。不要先写“提升带宽、降低 CPU 开销、支持池化”这类结论。
+
+### 检查术语域，避免复用已有缩写
+
+如果某个缩写或分代名在用户的评审上下文里已有含义，不要复用它描述另一套演进。AI Infra 文档里尤其要小心 `G1/G2/G3/G4`、`tier`、`cache`、`memory`、`direct`、`coherent`、`fabric`、`pool`、`runtime` 等高重载词。必要时先定义术语域，或改用“阶段 1/2/3”“路径 A/B/C”等中性命名。
+
 ### 表格用于复习，不用于首次解释
 
 表格很适合总结，但不适合第一次解释复杂机制。
@@ -316,6 +352,11 @@ index entry
 8. 是否避免一开始使用过于复杂的大图？
 9. 是否先解释概念，再用表格总结？
 10. 是否给了读者继续学习或排查问题的路径？
+11. 涉及跨设备访问时，是否讲清楚 transaction path？
+12. 是否区分了语义层、控制层、地址层和物理层？
+13. 是否说明了真正搬数据的 agent / DMA master？
+14. 是否说明了 completion、ordering、error 和 fallback？
+15. 是否检查了术语是否与用户已有评审语境冲突？
 
 ## 常见修改方式
 
