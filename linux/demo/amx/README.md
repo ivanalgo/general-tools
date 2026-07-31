@@ -22,12 +22,19 @@ should be cached when the same weights are reused.
 Requirements:
 
 - Linux on x86-64.
-- A compiler with AMX intrinsic support (GCC 12+ is recommended).
+- A compiler with AMX intrinsic support. GCC 11 is the minimum; GCC 12+ is
+  recommended.
 - A processor/VM exposing AMX-TILE, AMX-BF16 and AMX-INT8.
 - A Linux kernel supporting ARCH_REQ_XCOMP_PERM for XTILEDATA.
 
     make
     make run
+
+If the system default is an older GCC, select a newer compiler explicitly:
+
+    make CC=gcc-12 CXX=g++-12
+
+GCC 8, 9 and 10 do not recognize -mamx-tile, -mamx-bf16 or -mamx-int8.
 
 Optional AMX-FP16 C++ build:
 
