@@ -131,19 +131,42 @@ public:
     template <int Reg>
     void load() const {
         static_assert(Reg >= 0 && Reg < 8);
-        _tile_loadd(Reg, this->data(), this->stride_bytes());
+        // GCC implements these intrinsics with token-pasting macros, so the
+        // register argument must be a literal at preprocessing time.
+        if constexpr (Reg == 0) _tile_loadd(0, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 1) _tile_loadd(1, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 2) _tile_loadd(2, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 3) _tile_loadd(3, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 4) _tile_loadd(4, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 5) _tile_loadd(5, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 6) _tile_loadd(6, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 7) _tile_loadd(7, this->data(), this->stride_bytes());
     }
 
     template <int Reg>
     void load_t1() const {
         static_assert(Reg >= 0 && Reg < 8);
-        _tile_stream_loadd(Reg, this->data(), this->stride_bytes());
+        if constexpr (Reg == 0) _tile_stream_loadd(0, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 1) _tile_stream_loadd(1, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 2) _tile_stream_loadd(2, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 3) _tile_stream_loadd(3, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 4) _tile_stream_loadd(4, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 5) _tile_stream_loadd(5, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 6) _tile_stream_loadd(6, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 7) _tile_stream_loadd(7, this->data(), this->stride_bytes());
     }
 
     template <int Reg>
     void store() const requires (!std::is_const_v<T>) {
         static_assert(Reg >= 0 && Reg < 8);
-        _tile_stored(Reg, this->data(), this->stride_bytes());
+        if constexpr (Reg == 0) _tile_stored(0, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 1) _tile_stored(1, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 2) _tile_stored(2, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 3) _tile_stored(3, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 4) _tile_stored(4, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 5) _tile_stored(5, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 6) _tile_stored(6, this->data(), this->stride_bytes());
+        else if constexpr (Reg == 7) _tile_stored(7, this->data(), this->stride_bytes());
     }
 
     constexpr auto as_const() const {
