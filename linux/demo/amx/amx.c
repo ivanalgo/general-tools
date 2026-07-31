@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 // Intel AMX C demo: zero-copy tile views, B packing and TMUL GEMM.
 // Linux/x86-64 only. The examples compute one maximum-size tile block.
 #if !defined(__x86_64__)
@@ -16,7 +20,9 @@
 
 #if defined(__linux__)
 #include <asm/prctl.h>
-#else
+#endif
+
+#ifndef ARCH_REQ_XCOMP_PERM
 #define ARCH_REQ_XCOMP_PERM 0x1023
 #endif
 

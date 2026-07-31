@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 // Educational Intel AMX example: memory-side tiles, B packing and TMUL GEMM.
 // Linux/x86-64 only. This is intentionally a one-block teaching kernel, not
 // a replacement for oneDNN/oneMKL.
@@ -22,9 +26,10 @@
 
 #if defined(__linux__)
 #include <asm/prctl.h>
-#else
-// Only used to let non-Linux x86 cross-compilers syntax-check this file.
-// request_amx_permission() below rejects execution outside Linux.
+#endif
+
+#ifndef ARCH_REQ_XCOMP_PERM
+// Old Linux UAPI headers may predate ARCH_REQ_XCOMP_PERM.
 #define ARCH_REQ_XCOMP_PERM 0x1023
 #endif
 
