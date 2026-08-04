@@ -2,15 +2,16 @@
 
 """从 atop 原始日志中提取内存记账信息。
 
-默认读取最新 atop 原始日志中的最新完整样本（通过 `atop -r` 回放），展示：
+默认读取最新 atop 原始日志中的最新样本（通过 `atop -r` 回放），展示：
 1. 整机物理内存/Swap 概览
 2. 内核/系统相关内存分项（直接基于 atop 的 MEM/SWP 行）
-3. 进程内存聚合与全部进程列表
+3. 当前已加载内核模块内存汇总
+4. 进程内存聚合与全部进程列表
 
 说明：
 - 进程侧优先使用 PSS（需要 atop 支持 `-R`），否则退化到 RSS。
 - 内核分项和进程分项来自不同视角，不应简单逐项相加。
-- 本脚本只依赖 atop 自身的 parseable 输出，不直接读 /proc。
+- atop 历史日志不记录每模块内存；模块内存来自当前机器的 /proc/modules。
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "rawfile",
         nargs="?",
-        help="atop 原始日志路径；省略时默认自动选择最新完整日志",
+        help="atop 原始日志路径；省略时默认自动选择最新日志",
     )
     parser.add_argument(
         "--live",
@@ -71,6 +72,22 @@ def parse_args() -> argparse.Namespace:
         "--include-zero",
         action="store_true",
         help="Top 进程中保留占用为 0 的条目",
+    )
+    parser.add_argument(
+        "--include-kthreads",
+        action="store_true",
+        help="进程列表中包含内核线程；默认过滤 kthreadd 及其无用户地址空间的后代",
+    )
+    parser.add_argument(
+        "--no-modules",
+        action="store_true",
+        help="不读取 /proc/modules，不展示当前内核模块内存",
+    )
+    parser.add_argument(
+        "--modules-top",
+        type=int,
+        default=0,
+        help="展示前多少个内核模块；默认 0 表示全部模块",
     )
     args = parser.parse_args()
     if args.live and (args.begin or args.end):
@@ -109,9 +126,7 @@ def find_latest_rawfile() -> str:
     if not dated_candidates:
         return str(sorted(candidates)[-1])
 
-    today = dt.date.today()
-    completed = [item for item in dated_candidates if item[0] < today]
-    selected = max(completed or dated_candidates, key=lambda item: item[0])[1]
+    selected = max(dated_candidates, key=lambda item: item[0])[1]
     return str(selected)
 
 
@@ -242,14 +257,57 @@ class Sample:
     mem: Optional[Dict[str, int]] = None
     swp: Optional[Dict[str, int]] = None
     procs: List[ProcessMem] = field(default_factory=list)
+    ppid_by_pid: Dict[int, int] = field(default_factory=dict)
+    cmdline_by_pid: Dict[int, str] = field(default_factory=dict)
+
+
+@dataclass
+class KernelModuleMem:
+    name: str
+    size_bytes: int
+    refcnt: int
+    deps: str
+    state: str
+
+
+def read_kernel_modules(path: str = "/proc/modules") -> List[KernelModuleMem]:
+    modules: List[KernelModuleMem] = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return modules
+    except PermissionError:
+        return modules
+
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        deps = parts[3]
+        if deps == "-":
+            deps = ""
+        else:
+            deps = deps.rstrip(",")
+        modules.append(
+            KernelModuleMem(
+                name=parts[0],
+                size_bytes=to_int(parts[1]),
+                refcnt=to_int(parts[2]),
+                deps=deps,
+                state=parts[4],
+            )
+        )
+
+    return sorted(modules, key=lambda m: m.size_bytes, reverse=True)
 
 
 def run_atop(args: argparse.Namespace) -> str:
     if args.live:
-        cmd = ["atop", "-P", "MEM,SWP,PRM", "-R", "-Z", "1", "1"]
+        cmd = ["atop", "-P", "MEM,SWP,PRG,PRM", "-R", "-Z", "1", "1"]
     else:
         rawfile = args.rawfile or find_latest_rawfile()
-        cmd = ["atop", "-r", rawfile, "-P", "MEM,SWP,PRM", "-R", "-Z"]
+        cmd = ["atop", "-r", rawfile, "-P", "MEM,SWP,PRG,PRM", "-R", "-Z"]
         begin = args.begin
         if begin is None and args.end is None and args.sample_index == -1:
             begin = default_begin_for_latest_sample(rawfile)
@@ -355,6 +413,15 @@ def parse_prm(tokens: List[str]) -> ProcessMem:
     )
 
 
+def parse_prg_identity(tokens: List[str]) -> Optional[tuple[int, int, str]]:
+    if len(tokens) < 17:
+        return None
+    pid = to_int(tokens[6])
+    cmdline = tokens[15]
+    ppid = to_int(tokens[16])
+    return pid, ppid, cmdline
+
+
 def parse_samples(raw_text: str) -> List[Sample]:
     samples: List[Sample] = []
     for raw_line in raw_text.splitlines():
@@ -373,6 +440,12 @@ def parse_samples(raw_text: str) -> List[Sample]:
             sample.mem = parse_mem(tokens)
         elif label == "SWP":
             sample.swp = parse_swp(tokens)
+        elif label == "PRG":
+            identity = parse_prg_identity(tokens)
+            if identity:
+                pid, ppid, cmdline = identity
+                sample.ppid_by_pid[pid] = ppid
+                sample.cmdline_by_pid[pid] = cmdline
         elif label == "PRM":
             sample.procs.append(parse_prm(tokens))
 
@@ -416,6 +489,38 @@ def print_kv(name: str, value: int, total: Optional[int] = None) -> None:
         print(f"  {label} {value_text}")
 
 
+def is_kernel_thread(proc: ProcessMem, sample: Sample) -> bool:
+    """Best-effort kernel thread detection for atop samples.
+
+    The most reliable live check is PF_KTHREAD in /proc/<pid>/stat, but atop raw
+    history does not store that flag. For historical samples, use kthreadd's
+    process tree (PID 2) plus the absence of user address space in PRM.
+    """
+
+    if proc.pid == 2:
+        return True
+    if proc.vsize_kib != 0 or proc.rss_kib != 0 or proc.swap_kib != 0:
+        return False
+
+    seen = set()
+    pid = proc.pid
+    while pid not in seen:
+        seen.add(pid)
+        ppid = sample.ppid_by_pid.get(pid)
+        if ppid is None:
+            break
+        if ppid == 2:
+            return True
+        if ppid <= 1 or ppid == pid:
+            break
+        pid = ppid
+
+    # Fallback for PRM-only or incomplete PRG samples: empty command line and
+    # no user address space are strong signals for kernel threads.
+    cmdline = sample.cmdline_by_pid.get(proc.pid)
+    return cmdline == "_" and proc.vsize_kib == 0 and proc.rss_kib == 0 and proc.swap_kib == 0
+
+
 def print_report(sample: Sample, args: argparse.Namespace) -> None:
     mem = sample.mem or {}
     swp = sample.swp or {}
@@ -429,12 +534,15 @@ def print_report(sample: Sample, args: argparse.Namespace) -> None:
     swap_total = swp.get("swap_total", 0)
     swap_used = max(swap_total - swp.get("swap_free", 0), 0)
 
-    processes = [p for p in sample.procs if p.is_process]
+    all_processes = [p for p in sample.procs if p.is_process]
+    kernel_threads = [p for p in all_processes if is_kernel_thread(p, sample)]
+    processes = all_processes if args.include_kthreads else [p for p in all_processes if not is_kernel_thread(p, sample)]
     total_rss = sum(kib_to_bytes(p.rss_kib) for p in processes)
     total_pss = sum(kib_to_bytes(p.pss_kib) for p in processes if p.pss_kib > 0)
     total_swap = sum(kib_to_bytes(p.swap_kib) for p in processes)
     total_locked = sum(kib_to_bytes(p.locked_kib) for p in processes)
     pss_available = any(p.pss_kib > 0 for p in processes)
+    modules = [] if args.no_modules else read_kernel_modules()
 
     sort_key = args.sort
     if sort_key == "auto":
@@ -487,8 +595,37 @@ def print_report(sample: Sample, args: argparse.Namespace) -> None:
     print_kv("zswap Pool", swp.get("zswap_pool", 0), swap_total)
     print()
 
+    if not args.no_modules:
+        print("=== 当前已加载内核模块内存（来自 /proc/modules，非 atop 历史样本）===")
+        if modules:
+            total_module = sum(m.size_bytes for m in modules)
+            shown_modules = modules[: args.modules_top] if args.modules_top > 0 else modules
+            title = f"Top {len(shown_modules)} 模块" if args.modules_top > 0 else f"全部 {len(shown_modules)} 个模块"
+            print_kv("模块 size 总和", total_module, page_total)
+            print(f"  {title}（按 SIZE 排序）")
+            print(
+                f"  {ljust_display('MODULE', 28)} "
+                f"{rjust_display('SIZE', 12)} "
+                f"{rjust_display('REF', 5)} "
+                f"{ljust_display('STATE', 8)} "
+                f"{ljust_display('DEPS', 36)}"
+            )
+            for mod in shown_modules:
+                print(
+                    f"  {ljust_display(fit_display(mod.name, 28), 28)} "
+                    f"{rjust_display(human_bytes(mod.size_bytes), 12)} "
+                    f"{rjust_display(mod.refcnt, 5)} "
+                    f"{ljust_display(mod.state, 8)} "
+                    f"{ljust_display(fit_display(mod.deps, 36), 36)}"
+                )
+        else:
+            print("  N/A：当前系统无法读取 /proc/modules，或没有已加载模块。")
+        print()
+
     print("=== 进程侧聚合（来自 atop PRM）===")
     print(f"  {ljust_display('进程数量', 24)} {rjust_display(len(processes), 12)}")
+    if not args.include_kthreads:
+        print(f"  {ljust_display('已过滤内核线程', 24)} {rjust_display(len(kernel_threads), 12)}")
     print_kv("进程 RSS 总和", total_rss, page_total)
     if pss_available:
         print_kv("进程 PSS 总和", total_pss, page_total)
@@ -515,16 +652,19 @@ def print_report(sample: Sample, args: argparse.Namespace) -> None:
     print()
     print("说明:")
     print("  1) 进程 RSS 会重复计算共享页；PSS 更适合做总量记账。")
+    print("  2) 内核模块 size 来自当前 /proc/modules，不是 atop raw 历史样本的一部分。")
+    print("  3) 模块 size 不包含模块运行时通过 slab/vmalloc/page allocator 动态申请且未释放的全部内存。")
+    print("  4) 默认过滤内核线程：优先依据 kthreadd(PID 2) 后代关系和 PRM 中无用户地址空间判断。")
     if not pss_available:
-        print("  2) 当前 atop 样本未记录 PSS；历史 raw 日志只有录制时启用 atop -R 才能保留 PSS。")
-        print("  3) atop 回放时加 -R 不能为旧 raw 日志重新计算 PSS，因为历史进程的 smaps 已不存在。")
-        print("  4) atop 的内核分项与进程分项属于不同观察维度，不能逐项简单相加。")
-        print("  5) 可回收内存估计 = cache + buffers + slab_reclaimable。")
-        print("  6) 不可回收已用估计 = 已用内存 - 可回收内存估计。")
+        print("  5) 当前 atop 样本未记录 PSS；历史 raw 日志只有录制时启用 atop -R 才能保留 PSS。")
+        print("  6) atop 回放时加 -R 不能为旧 raw 日志重新计算 PSS，因为历史进程的 smaps 已不存在。")
+        print("  7) atop 的内核分项与进程分项属于不同观察维度，不能逐项简单相加。")
+        print("  8) 可回收内存估计 = cache + buffers + slab_reclaimable。")
+        print("  9) 不可回收已用估计 = 已用内存 - 可回收内存估计。")
     else:
-        print("  2) atop 的内核分项与进程分项属于不同观察维度，不能逐项简单相加。")
-        print("  3) 可回收内存估计 = cache + buffers + slab_reclaimable。")
-        print("  4) 不可回收已用估计 = 已用内存 - 可回收内存估计。")
+        print("  5) atop 的内核分项与进程分项属于不同观察维度，不能逐项简单相加。")
+        print("  6) 可回收内存估计 = cache + buffers + slab_reclaimable。")
+        print("  7) 不可回收已用估计 = 已用内存 - 可回收内存估计。")
 
 
 def main() -> None:
