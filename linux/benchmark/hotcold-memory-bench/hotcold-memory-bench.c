@@ -20,7 +20,7 @@ enum assess_mode { ASSESS_NONE, ASSESS_EVICTION, ASSESS_TIERING };
 struct options {
 	uint64_t total, hot, duration, interval, assess_at, settle;
 	uint64_t memory_max, cold_threshold, seed;
-	const char *cgroup, *fast_nodes, *slow_nodes;
+	const char *cgroup, *fast_nodes, *slow_nodes, *backing_file;
 	enum assess_mode assess;
 	bool csv, counters;
 };
@@ -28,6 +28,7 @@ struct bench {
 	struct options o;
 	uint8_t *mem;
 	uint32_t *count;
+	int backing_fd;
 	uint64_t page_size, pages, hot_pages, current, chases, last_chases;
 	long last_faults;
 	struct timespec start, last;
@@ -45,6 +46,7 @@ static void usage(FILE *f, const char *p)
 	fprintf(f,
 "usage: %s --total-size SIZE --hot-size SIZE [options]\n"
 "  --duration SEC --interval SEC --seed N --output text|csv\n"
+"  --backing-file PATH\n"
 "  --no-page-counters\n"
 "  --assess eviction --assess-at SEC --cgroup PATH --memory-max SIZE --settle SEC\n"
 "  --assess tiering --assess-at SEC --fast-nodes LIST --slow-nodes LIST\n"
@@ -86,7 +88,7 @@ bad:
 static void options(int argc, char **argv, struct options *o)
 {
 	enum { TOTAL=1000,HOT,DURATION,INTERVAL,SEED,OUTPUT,NOCOUNTERS,ASSESS,
-		ASSESSAT,CGROUP,MEMMAX,SETTLE,FAST,SLOW,COLD };
+		ASSESSAT,CGROUP,MEMMAX,SETTLE,FAST,SLOW,COLD,BACKING };
 	static const struct option lo[] = {
 		{"total-size",1,0,TOTAL},{"hot-size",1,0,HOT},{"duration",1,0,DURATION},
 		{"interval",1,0,INTERVAL},{"seed",1,0,SEED},{"output",1,0,OUTPUT},
@@ -94,7 +96,8 @@ static void options(int argc, char **argv, struct options *o)
 		{"assess-at",1,0,ASSESSAT},{"cgroup",1,0,CGROUP},
 		{"memory-max",1,0,MEMMAX},{"settle",1,0,SETTLE},
 		{"fast-nodes",1,0,FAST},{"slow-nodes",1,0,SLOW},
-		{"cold-threshold",1,0,COLD},{"help",0,0,'h'},{0}
+		{"cold-threshold",1,0,COLD},{"backing-file",1,0,BACKING},
+		{"help",0,0,'h'},{0}
 	};
 	int c;
 	*o = (struct options){.duration=120,.interval=1,.assess_at=60,
@@ -123,6 +126,7 @@ static void options(int argc, char **argv, struct options *o)
 		case FAST:o->fast_nodes=optarg;break;
 		case SLOW:o->slow_nodes=optarg;break;
 		case COLD:o->cold_threshold=number(optarg,"cold-threshold");break;
+		case BACKING:o->backing_file=optarg;break;
 		case 'h':usage(stdout,argv[0]);exit(0);
 		default:usage(stderr,argv[0]);exit(1);
 		}
@@ -147,11 +151,20 @@ static uint64_t random64(uint64_t *s)
 static void initialize(struct bench *b)
 {
 	uint64_t *order,state=b->o.seed,i;
+	int flags=MAP_POPULATE;
 	b->page_size=sysconf(_SC_PAGESIZE);
 	b->pages=b->o.total/b->page_size; b->hot_pages=b->o.hot/b->page_size;
 	if (!b->pages || !b->hot_pages) { fputs("error: size below one page\n",stderr);exit(1); }
 	b->o.total=b->pages*b->page_size; b->o.hot=b->hot_pages*b->page_size;
-	b->mem=mmap(0,b->o.total,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE,-1,0);
+	b->backing_fd=-1;
+	if(b->o.backing_file){
+		b->backing_fd=open(b->o.backing_file,O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC,0600);
+		if(b->backing_fd<0)die("open backing file");
+		if(ftruncate(b->backing_fd,b->o.total))die("ftruncate backing file");
+		if(unlink(b->o.backing_file))die("unlink backing file");
+		flags|=MAP_SHARED;
+	}else flags|=MAP_PRIVATE|MAP_ANONYMOUS;
+	b->mem=mmap(0,b->o.total,PROT_READ|PROT_WRITE,flags,b->backing_fd,0);
 	if (b->mem==MAP_FAILED) die("mmap");
 	if (madvise(b->mem,b->o.total,MADV_NOHUGEPAGE)) die("madvise");
 	if (b->o.counters && !(b->count=calloc(b->pages,sizeof(*b->count)))) die("counters");
@@ -160,6 +173,7 @@ static void initialize(struct bench *b)
 	for(i=0;i<b->hot_pages;i++)order[i]=i;
 	for(i=b->hot_pages-1;i;i--){uint64_t j=random64(&state)%(i+1),t=order[i];order[i]=order[j];order[j]=t;}
 	for(i=0;i<b->hot_pages;i++)*(uint64_t*)(b->mem+order[i]*b->page_size)=order[(i+1)%b->hot_pages];
+	if(b->o.backing_file&&msync(b->mem,b->o.total,MS_SYNC))die("msync backing file");
 	b->current=order[0];free(order);
 }
 
@@ -270,5 +284,7 @@ int main(int argc,char **argv)
 	printf("CONFIG page_size=%"PRIu64" total_bytes=%"PRIu64" hot_bytes=%"PRIu64
 		" pages=%"PRIu64" hot_pages=%"PRIu64" seed=%"PRIu64"\n",
 		b.page_size,b.o.total,b.o.hot,b.pages,b.hot_pages,b.o.seed);fflush(stdout);
-	run(&b);munmap(b.mem,b.o.total);free(b.count);return 0;
+	run(&b);munmap(b.mem,b.o.total);
+	if(b.backing_fd>=0)close(b.backing_fd);
+	free(b.count);return 0;
 }

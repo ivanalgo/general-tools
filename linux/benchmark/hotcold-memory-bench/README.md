@@ -32,6 +32,11 @@ are known cold pages. Warm-up accesses are not counted.
 Transparent huge pages are disabled for the mapping so one counter and placement
 observation corresponds to one base page. Use a fixed --seed for repeatability.
 
+Use --backing-file PATH to create an exclusive, temporary file-backed mapping.
+The file is unlinked immediately after mapping and initialization is flushed
+with msync(), leaving clean cache pages that can be reclaimed without swap.
+This mode tests LRU accuracy independently of anonymous swap configuration.
+
 ## Performance
 
     ./hotcold-memory-bench \
@@ -57,6 +62,10 @@ At assessment time the benchmark pauses pointer chasing, lowers memory.max,
 waits for reclaim, and queries residency with mincore() without touching the
 workload pages. Pausing prevents an incorrectly evicted hot page from faulting
 back in before it can be measured.
+
+For a clean page-cache eviction test, add:
+
+    --backing-file /data00/hotcold-memory-bench.tmp
 
 Do not set memory.max equal to the hot-data size. Page tables, access counters,
 executable pages, shared libraries, and runtime data also need memory.
