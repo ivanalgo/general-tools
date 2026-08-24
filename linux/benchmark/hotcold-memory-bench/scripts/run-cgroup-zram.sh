@@ -6,10 +6,8 @@ if [ "$#" -lt 3 ]; then
 fi
 total=$1 hot=$2 target=$3
 shift 3
-bench=./hotcold-memory-bench
-test -z "\${BENCH_BIN+x}" || bench=$BENCH_BIN
-root=/sys/fs/cgroup
-test -z "\${CGROUP_ROOT+x}" || root=$CGROUP_ROOT
+bench=${BENCH_BIN:-./hotcold-memory-bench}
+root=${CGROUP_ROOT:-/sys/fs/cgroup}
 group=$root/hotcold-memory-bench.$$
 [ "$(id -u)" -eq 0 ] || { echo "error: run as root" >&2; exit 1; }
 [ -f "$root/cgroup.controllers" ] || { echo "error: cgroup v2 required" >&2; exit 1; }

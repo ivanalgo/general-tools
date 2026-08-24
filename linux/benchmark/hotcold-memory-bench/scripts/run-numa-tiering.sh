@@ -6,8 +6,7 @@ if [ "$#" -lt 4 ]; then
 fi
 total=$1 hot=$2 fast=$3 slow=$4
 shift 4
-bench=./hotcold-memory-bench
-test -z "\${BENCH_BIN+x}" || bench=$BENCH_BIN
+bench=${BENCH_BIN:-./hotcold-memory-bench}
 command -v numactl >/dev/null || { echo "error: numactl required" >&2; exit 1; }
 exec numactl --cpunodebind="$fast" --membind="$fast" "$bench" \
 	--total-size "$total" --hot-size "$hot" --assess tiering \
