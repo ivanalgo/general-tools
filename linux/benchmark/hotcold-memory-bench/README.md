@@ -70,6 +70,27 @@ For a clean page-cache eviction test, add:
 Do not set memory.max equal to the hot-data size. Page tables, access counters,
 executable pages, shared libraries, and runtime data also need memory.
 
+### Native versus proactive LRU aging
+
+`scripts/run-memory-aging-ab.sh` runs one reproducible side of an A/B test.
+Use `native` under an unmodified kernel and `aging` under a kernel exposing the
+cgroup v2 `memory.aging` file:
+
+    scripts/run-memory-aging-ab.sh native anon /tmp/native-results
+    scripts/run-memory-aging-ab.sh aging anon /tmp/aging-results
+
+The aging side repeatedly writes a bounded scan size and reads the kernel's
+progress counters. It refuses to lower `memory.max` unless the requested number
+of whole-cgroup rounds actually completed with time left before assessment.
+It also records LRU, reclaim, swap, throughput, accuracy, per-write latency,
+actual scanned pages, and completed rounds in log and CSV files.
+
+Defaults are a 10 GiB working set, 2 GiB hot set, 6 GiB final limit, four
+rounds, and 1 GiB aging writes. Environment variables such as `TOTAL_SIZE`,
+`HOT_SIZE`, `MEMORY_MAX`, `ROUNDS`, `AGING_BUDGET`, `AGING_PERIOD`,
+`ASSESS_AT`, and `DURATION` override them. Pass `file` instead of `anon` for
+a clean page-cache test that does not depend on swap behavior.
+
 ## NUMA and CXL tiering accuracy
 
 Tiering mode pauses and queries every page's NUMA node with move_pages(2). It
