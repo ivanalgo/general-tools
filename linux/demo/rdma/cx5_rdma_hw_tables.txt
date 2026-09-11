@@ -96,34 +96,26 @@ ConnectX-5 RDMA 硬件资源表全景大图
                                       3. QPC 表及其左边界出线
 ====================================================================================================
 
-                                        +----------------------------------------------------------------------------------+
-                                        | [NIC] QPC Table - Queue Pair Context Table                                       |
-                                        |----------------------------------------------------------------------------------|
-                                        | +------------------------------------------------+   [...]   +------------------+ |
-                                        | | QPC_entry[0]                                   |           | QPC_entry[N]     | |
-                                        | | - qpn = 0                                      |           | - qpn = N         | |
-                                        | | - transport = RC / UC / UD / RAW               |           | - transport       | |
-                                        | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state           | |
-pdn         <---+-----------------------| | - pdn                                          |           | - pdn             | |
-                |                       | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attrs    | |
-                |                       | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs      | |
-sq_wq_ptr   <------+--------------------| | - sq_wq_ptr                                    |           | - sq_wq_ptr       | |
-rq_wq_ptr   <---------+-----------------| | - rq_wq_ptr                                    |           | - rq_wq_ptr       | |
-send_cqn    <------------+--------------| | - send_cqn                                     |           | - send_cqn        | |
-recv_cqn    <---------------+-----------| | - recv_cqn                                     |           | - recv_cqn        | |
-sq_dbr_ptr  <------------------+--------| | - sq_dbr_ptr                                   |           | - sq_dbr_ptr      | |
-rq_dbr_ptr  <---------------------+-----| | - rq_dbr_ptr                                   |           | - rq_dbr_ptr      | |
-tisn        <------------------------+--| | - tisn                                         |           | - tisn            | |
-                |  |  |  |  |  |  |  |  | +------------------------------------------------+           +------------------+ |
-                |  |  |  |  |  |  |  |  +----------------------------------------------------------------------------------+
-                |  |  |  |  |  |  |  +--> [NIC]  TIS Table                 (tisn)
-                |  |  |  |  |  |  +-----> [DRAM] Doorbell Record Table     (rq_dbr_ptr)
-                |  |  |  |  |  +--------> [DRAM] Doorbell Record Table     (sq_dbr_ptr)
-                |  |  |  |  +-----------> [NIC]  CQC Table                 (recv_cqn)
-                |  |  |  +--------------> [NIC]  CQC Table                 (send_cqn)
-                |  |  +-----------------> [DRAM] RQ WQE Ring Table         (rq_wq_ptr)
-                |  +--------------------> [DRAM] SQ WQE Ring Table         (sq_wq_ptr)
-                +-----------------------> [NIC]  PD Table                  (pdn)
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [NIC] QPC Table - Queue Pair Context Table                                       |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | QPC_entry[0]                                   |           | QPC_entry[N]     | |
+                                                        | | - qpn = 0                                      |           | - qpn = N         | |
+                                                        | | - transport = RC / UC / UD / RAW               |           | - transport       | |
+                                                        | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state           | |
+[NIC] PD Table (pdn)                                <---| | - pdn                                          |           | - pdn             | |
+                                                        | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attrs    | |
+                                                        | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs      | |
+[DRAM] SQ WQE Ring Table (sq_wq_ptr)                <---| | - sq_wq_ptr                                    |           | - sq_wq_ptr       | |
+[DRAM] RQ WQE Ring Table (rq_wq_ptr)                <---| | - rq_wq_ptr                                    |           | - rq_wq_ptr       | |
+[NIC] CQC Table (send_cqn)                          <---| | - send_cqn                                     |           | - send_cqn        | |
+[NIC] CQC Table (recv_cqn)                          <---| | - recv_cqn                                     |           | - recv_cqn        | |
+[DRAM] Doorbell Record Table (sq_dbr_ptr)           <---| | - sq_dbr_ptr                                   |           | - sq_dbr_ptr      | |
+[DRAM] Doorbell Record Table (rq_dbr_ptr)           <---| | - rq_dbr_ptr                                   |           | - rq_dbr_ptr      | |
+[NIC] TIS Table (tisn)                              <---| | - tisn                                         |           | - tisn            | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
