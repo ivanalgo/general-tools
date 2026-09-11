@@ -203,7 +203,7 @@ int run_server(const struct demo_options *opt)
     rdma_resources_set_cm_timeout(&res, opt->cm_timeout_ms);
 
     int rc = -1;
-    if (rdma_server_listen(&res, opt->port, 1) != 0) {
+    if (rdma_server_listen(&res, opt->bind_addr, opt->port, 1) != 0) {
         goto out;
     }
     if (rdma_server_accept_one(&res, opt->size, opt->cq_depth) != 0) {
@@ -227,7 +227,8 @@ int run_client(const struct demo_options *opt)
     rdma_resources_set_cm_timeout(&res, opt->cm_timeout_ms);
 
     int rc = -1;
-    if (rdma_client_connect(&res, opt->addr, opt->port, opt->size, opt->cq_depth) != 0) {
+    if (rdma_client_connect(&res, opt->addr, opt->bind_addr,
+                            opt->port, opt->size, opt->cq_depth) != 0) {
         goto out;
     }
     if (do_handshake(&res) != 0) {

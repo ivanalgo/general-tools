@@ -48,14 +48,15 @@ void print_usage(const char *prog)
 {
     fprintf(stderr,
             "Usage:\n"
-            "  %s --server [--port 7471] [--size 4096] [--iters 10]\n"
-            "  %s --client --addr <server-ip> [--port 7471] [--mode send|write|read|all]\n"
+            "  %s --server [--bind-addr <local-ip>] [--port 7471] [--size 4096]\n"
+            "  %s --client --addr <server-ip> [--bind-addr <local-ip>] [--port 7471]\n"
             "  %s --selftest [--dev-a rxe0 --dev-b rxe1] [--mode send|write|read|all]\n"
             "Options:\n"
             "  -s, --server          run as RDMA CM server/listener\n"
             "  -c, --client          run as RDMA CM client/connector\n"
             "      --selftest        run one-process verbs test without RDMA CM\n"
             "  -a, --addr ADDR       server IPv4/IPv6 address for client\n"
+            "      --bind-addr ADDR  local IPv4/IPv6 address used by RDMA CM to select netdev/RDMA device\n"
             "  -p, --port PORT       TCP/RDMA-CM service port, default 7471\n"
             "  -m, --mode MODE       send/write/read/all, default all\n"
             "  -z, --size SIZE       bytes per operation, supports K/M suffix, default 4096\n"
@@ -76,6 +77,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         .role = 0,
         .mode = MODE_ALL,
         .addr = NULL,
+        .bind_addr = NULL,
         .port = RDMA_DEMO_DEFAULT_PORT,
         .size = 4096,
         .iters = 10,
@@ -92,6 +94,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         {"client", no_argument, NULL, 'c'},
         {"selftest", no_argument, NULL, 1002},
         {"addr", required_argument, NULL, 'a'},
+        {"bind-addr", required_argument, NULL, 1006},
         {"port", required_argument, NULL, 'p'},
         {"mode", required_argument, NULL, 'm'},
         {"size", required_argument, NULL, 'z'},
@@ -113,6 +116,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         case 'c': opt->role = ROLE_CLIENT; break;
         case 1002: opt->role = ROLE_SELFTEST; break;
         case 'a': opt->addr = optarg; break;
+        case 1006: opt->bind_addr = optarg; break;
         case 'p': opt->port = optarg; break;
         case 'm':
             if (parse_mode(optarg, &opt->mode) != 0) {

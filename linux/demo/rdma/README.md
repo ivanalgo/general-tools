@@ -97,12 +97,28 @@ cd linux/demo/rdma
 ./scripts/run_local_test.sh
 ```
 
-默认一键测试使用 `--selftest`，即在同一个进程内创建两个 verbs 端点，分别打开 `rxe_demo0` / `rxe_demo1`，手工迁移 QP 到 RTS，然后完整测试 SEND / RDMA WRITE / RDMA READ。
+默认一键测试使用 `--selftest`，即在同一个进程内创建两个 verbs 端点，分别打开 `rxe_demo0` / `rxe_demo1`，手工迁移 QP 到 RTS，然后依次完整测试 `send`、`write`、`read`、`all` 四个 case。
+
+每个 case 都不是“只创建资源”：
+
+- `send`：A 端 `IBV_WR_SEND`，B 端预投递 RQ WQE 接收，并校验接收 buffer 的 pattern。
+- `write`：A 端 `IBV_WR_RDMA_WRITE` 直接写 B 端 MR，随后检查 B 端内存 pattern。
+- `read`：B 端准备 MR 数据，A 端 `IBV_WR_RDMA_READ` 读回本地，并校验本地 buffer pattern。
+- `all`：在一个进程中连续执行上述三类操作。
+
+只要任意 case 数据校验失败、CQE 状态异常或 WQE 提交失败，脚本会立即退出非 0。
 
 可以通过环境变量调整参数：
 
 ```bash
-MODE=write SIZE=2048 ITERS=5 DEV_A=rxe_demo0 DEV_B=rxe_demo1 GID_INDEX=0 ./scripts/run_local_test.sh
+SIZE=2048 ITERS=5 DEV_A=rxe_demo0 DEV_B=rxe_demo1 GID_INDEX=0 ./scripts/run_local_test.sh
+```
+
+只运行部分 case：
+
+```bash
+CASES="send write" ./scripts/run_local_test.sh
+# 兼容旧用法：MODE=write ./scripts/run_local_test.sh
 ```
 
 显示完整 libibverbs provider warning：
@@ -122,16 +138,22 @@ SHOW_IBV_WARNINGS=1 ./scripts/run_local_test.sh
 终端 1：
 
 ```bash
-./rdma_demo --server --port 7471 --size 1024 --iters 3 --verbose
+./rdma_demo --server --bind-addr 192.168.130.2 --port 7471 --size 1024 --iters 3 --verbose
 ```
 
 终端 2：
 
 ```bash
-./rdma_demo --client --addr 192.168.130.2 --port 7471 --mode all --size 1024 --iters 3 --verbose
+./rdma_demo --client --bind-addr 192.168.130.1 --addr 192.168.130.2 --port 7471 --mode all --size 1024 --iters 3 --verbose
 ```
 
-注意：server/client 模式使用 RDMA CM。在一台机器的同一个 network namespace 内连接本机另一个 IP 时，Linux 可能通过 `local/lo` 路由处理地址，导致 RDMA CM 地址解析不选择 RXE 设备。此时推荐使用上面的 `--selftest` 完成本机双 RXE 设备验证；跨两台机器或具备正确 RDMA netns 隔离时再使用 server/client 模式。
+RDMA CM 模式不能直接传 `rxe_demo0` / `rxe_demo1` 这类 RDMA 设备名；它通过本地/目标 IP 地址和内核路由选择 eth 设备，再映射到该 eth 设备上的 RDMA 设备。因此：
+
+- server 用 `--bind-addr` 绑定监听 IP，例如 `192.168.130.2`，让 CM 监听这个 IP 对应的 netdev/RDMA 设备。
+- client 用 `--bind-addr` 绑定源 IP，例如 `192.168.130.1`，让 CM 从这个 IP 对应的 netdev/RDMA 设备发起连接。
+- `--addr` 是 server 的目标 IP。
+
+注意：server/client 模式使用 RDMA CM。在一台机器的同一个 network namespace 内连接本机另一个 IP 时，Linux 仍可能通过 `local/lo` 路由处理地址，导致 RDMA CM 地址解析不选择 RXE 设备；即使加了 `--bind-addr`，目标地址如果显示为 `local ... dev lo`，也不适合用 CM 模式验证。此时推荐使用上面的 `--selftest` 完成本机双 RXE 设备验证；跨两台机器或具备正确 RDMA netns 隔离时再使用 server/client 模式。
 
 如果只启动 client 而没有先启动 server，client 会在 RDMA CM 连接阶段等待/失败。可以用 `--cm-timeout-ms` 缩短等待时间并看到明确错误，例如：
 
@@ -159,6 +181,7 @@ server done: send=3 write=3 read=3
 ```text
 --server / --client        选择服务端或客户端
 --addr ADDR               client 连接的 server IP
+--bind-addr ADDR          RDMA CM server/client 绑定的本地 IP，用来约束 eth/RDMA 设备选择
 --port PORT               RDMA CM 端口，默认 7471
 --mode send|write|read|all 测试模式，默认 all
 --size SIZE               每次操作的数据长度，支持 K/M 后缀；当前 SEND 控制缓冲最大约 3.9KiB

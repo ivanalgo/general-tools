@@ -38,6 +38,7 @@ struct demo_options {
     enum demo_role role;
     enum demo_mode mode;
     const char *addr;
+    const char *bind_addr;
     const char *port;
     size_t size;
     int iters;
@@ -95,10 +96,11 @@ int run_verbs_selftest(const struct demo_options *opt);
 void rdma_resources_init(struct rdma_resources *res, int verbose);
 void rdma_resources_set_cm_timeout(struct rdma_resources *res, int timeout_ms);
 void rdma_resources_cleanup(struct rdma_resources *res);
-int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog);
+int rdma_server_listen(struct rdma_resources *res, const char *bind_addr,
+                       const char *port, int backlog);
 int rdma_server_accept_one(struct rdma_resources *res, size_t data_size, int cq_depth);
-int rdma_client_connect(struct rdma_resources *res, const char *addr, const char *port,
-                        size_t data_size, int cq_depth);
+int rdma_client_connect(struct rdma_resources *res, const char *addr, const char *bind_addr,
+                        const char *port, size_t data_size, int cq_depth);
 int rdma_send_info(struct rdma_resources *res);
 int rdma_recv_info(struct rdma_resources *res);
 int rdma_post_recv(struct rdma_resources *res);

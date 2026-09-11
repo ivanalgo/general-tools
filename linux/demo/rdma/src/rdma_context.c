@@ -221,16 +221,17 @@ static int build_qp_and_memory(struct rdma_resources *res, size_t data_size, int
     return 0;
 }
 
-int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog)
+int rdma_server_listen(struct rdma_resources *res, const char *bind_addr,
+                       const char *port, int backlog)
 {
     struct addrinfo hints;
     struct addrinfo *ai = NULL;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_flags = AI_PASSIVE;
+    hints.ai_flags = bind_addr ? 0 : AI_PASSIVE;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    int rc = getaddrinfo(NULL, port, &hints, &ai);
+    int rc = getaddrinfo(bind_addr, port, &hints, &ai);
     if (rc != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
         return -1;
@@ -255,7 +256,11 @@ int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog
         return die_errno("rdma_create_id(listen)");
     }
 
-    /* rdma_bind_addr() 绑定监听地址；控制面操作，不创建 SQ/RQ/CQ。 */
+    /*
+     * rdma_bind_addr() 绑定监听地址。
+     * RDMA-CM 不能直接按“设备名”绑定 rxe_demo0/mlx5_0；它根据这里的本地 IP
+     * 和内核路由/网卡地址选择对应 netdev，再映射到该 netdev 上的 RDMA 设备。
+     */
     if (rdma_bind_addr(res->listen_id, ai->ai_addr) != 0) {
         freeaddrinfo(ai);
         return die_errno("rdma_bind_addr");
@@ -269,7 +274,7 @@ int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog
     if (rdma_listen(res->listen_id, backlog) != 0) {
         return die_errno("rdma_listen");
     }
-    printf("server listening on port %s\n", port);
+    printf("server listening on %s:%s\n", bind_addr ? bind_addr : "0.0.0.0", port);
     return 0;
 }
 
@@ -316,11 +321,12 @@ int rdma_server_accept_one(struct rdma_resources *res, size_t data_size, int cq_
     return 0;
 }
 
-int rdma_client_connect(struct rdma_resources *res, const char *addr, const char *port,
-                        size_t data_size, int cq_depth)
+int rdma_client_connect(struct rdma_resources *res, const char *addr, const char *bind_addr,
+                        const char *port, size_t data_size, int cq_depth)
 {
     struct addrinfo hints;
     struct addrinfo *dst = NULL;
+    struct addrinfo *src = NULL;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -341,12 +347,37 @@ int rdma_client_connect(struct rdma_resources *res, const char *addr, const char
         return die_errno("rdma_create_id(client)");
     }
 
+    if (bind_addr) {
+        struct addrinfo src_hints;
+        memset(&src_hints, 0, sizeof(src_hints));
+        src_hints.ai_family = dst->ai_family;
+        src_hints.ai_socktype = SOCK_STREAM;
+        int src_rc = getaddrinfo(bind_addr, NULL, &src_hints, &src);
+        if (src_rc != 0) {
+            freeaddrinfo(dst);
+            fprintf(stderr, "getaddrinfo(bind-addr): %s\n", gai_strerror(src_rc));
+            return -1;
+        }
+        /*
+         * rdma_bind_addr() 为 client 绑定源地址。
+         * 这会限制 RDMA-CM 使用该源 IP 对应的 netdev/RDMA 设备；例如源 IP 在
+         * eth0/rxe0 上，就会优先使用这个路径去解析目标地址。
+         */
+        if (rdma_bind_addr(res->id, src->ai_addr) != 0) {
+            freeaddrinfo(src);
+            freeaddrinfo(dst);
+            return die_errno("rdma_bind_addr(client source)");
+        }
+        freeaddrinfo(src);
+    }
+
     /*
-     * rdma_resolve_addr() 根据目标 IP 选择本地 RDMA 设备/GID/源地址。
-     * Soft-RoCE 场景会按 IP 路由映射到 rxe 设备；这是“同机两个 rxe 设备”测试的关键。
+     * rdma_resolve_addr() 根据源/目标 IP 选择本地 RDMA 设备/GID/源地址。
+     * Soft-RoCE 场景会按 IP 路由映射到 rxe 设备；如果传入 --bind-addr，
+     * 源地址会约束 client 使用指定本地 eth/rxe 路径。
      */
-    printf("client resolving RDMA address %s:%s (timeout %d ms)\n",
-           addr, port, res->cm_timeout_ms);
+    printf("client resolving RDMA address from %s to %s:%s (timeout %d ms)\n",
+           bind_addr ? bind_addr : "<route-selected>", addr, port, res->cm_timeout_ms);
     if (rdma_resolve_addr(res->id, NULL, dst->ai_addr, res->cm_timeout_ms) != 0) {
         freeaddrinfo(dst);
         return die_errno("rdma_resolve_addr");
