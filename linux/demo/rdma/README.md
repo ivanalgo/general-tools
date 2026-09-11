@@ -22,7 +22,7 @@ rdma/
 ├── src/rdma_context.c       # RDMA CM / verbs 资源管理与操作封装
 └── scripts/
     ├── setup_soft_roce.sh   # 创建/删除同机双 RXE 设备
-    └── run_local_test.sh    # 一键启动 server/client 本地测试
+    └── run_local_test.sh    # 一键启动本地 selftest/CM 测试
 ```
 
 ## 安装依赖
@@ -35,6 +35,8 @@ sudo apt-get install -y build-essential rdma-core librdmacm-dev libibverbs-dev i
 ```
 
 如果系统安装的是厂商 OFED（例如 MLNX_OFED），但 `ibv_devinfo` 报 `couldn't load driver 'librxe-rdmavXX.so'`，需要确保安装了与当前 `libibverbs` ABI 匹配的 RXE userspace provider。否则 `rdma_rxe` 内核设备虽然能创建，用户态 verbs 仍无法打开 RXE 设备。
+
+如果测试已经通过，但输出里有 `libibverbs: Warning: couldn't load driver 'libmthca-rdmav34.so'` 这类消息，通常只是 `/etc/libibverbs.d/` 里存在其它 HCA provider 配置，而机器上没有安装对应硬件/动态库；RXE provider 能正常打开时不影响 demo。`run_local_test.sh` 默认会过滤这类已知噪音；如需查看完整 libibverbs warning，可设置 `SHOW_IBV_WARNINGS=1`。
 
 CentOS / RHEL / Fedora：
 
@@ -101,6 +103,12 @@ cd linux/demo/rdma
 
 ```bash
 MODE=write SIZE=2048 ITERS=5 DEV_A=rxe_demo0 DEV_B=rxe_demo1 GID_INDEX=0 ./scripts/run_local_test.sh
+```
+
+显示完整 libibverbs provider warning：
+
+```bash
+SHOW_IBV_WARNINGS=1 ./scripts/run_local_test.sh
 ```
 
 也可以直接运行：
