@@ -1,66 +1,60 @@
-ConnectX-5 RDMA 硬件资源表全景大图
+ConnectX-5 RDMA Hardware Resource Tables
 ====================================
 
-本文件用于放到 GitHub 直接打开阅读。建议使用等宽字体查看。
+This file is intended for direct reading on GitHub. Use a monospace font.
 
-范围：
-  - 只画 CX5 NIC 硬件侧上下文表，以及硬件上下文指向的主机 DRAM 表。
-  - 不画 ibverbs、libmlx5、mlx5_core、rdma_cm 等软件对象。
+Scope:
+  - Only CX5 NIC-side hardware context tables and host DRAM tables referenced by them are shown.
+  - Software objects such as ibverbs, libmlx5, mlx5_core, and rdma_cm are not shown.
 
-画法约定：
-  - 每张表都画成：entry[0] -> [...] -> entry[N]。
-  - 指向其它表/资源的 field，不在表内部横向穿线；统一从“框图左边界”直接出线。
-  - 形式如下：
+Drawing convention:
+  - Each table is drawn as: entry[0] -> [...] -> entry[N].
+  - Fields that reference other tables/resources exit directly from the box border; no internal crossing lines.
+  - Form:
 
         target table/resource (field_name)   <---| | - field_name
 
-    即：field 所在行从表格左边界拉出，左侧直接写它关联到的目标表/资源；不再在表格下方画折线。
+    That is, the target table/resource is written on the same field row; no folded lines below the table.
 
-图例：
-  [NIC]   CX5 NIC 硬件侧：硬件上下文表 / ICM context / 片上硬件资源
-  [DRAM]  主机 CPU DRAM 侧：WQE/CQE/EQE/MTT/KLM/DBR/用户数据页
-  [BAR]   PCIe BAR 映射区域：UAR / BlueFlame / Doorbell MMIO
-  <---|   从框图左边界直接引出到左侧目标说明
-  --->    NIC 左侧硬件表到右侧 DRAM 表/资源的关联箭头
-  ===>    数据流 / doorbell / packet / completion / event
-
-
-====================================================================================================
-                                      0. 表位置总览
-====================================================================================================
-
-  NIC / BAR 硬件侧表放左边，主机 DRAM 侧表放右边；箭头表示硬件上下文里的指针/编号关联。
-
-  +--------------------------------------+          +-----------------------------------------------+
-  | [NIC] CX5 硬件侧上下文表             |          | [DRAM] 主机 CPU 内存侧表                       |
-  |--------------------------------------|          |-----------------------------------------------|
-  | QPC Table                            | --+----> | SQ WQE Ring                                   |
-  |  - sq_wq_ptr / rq_wq_ptr             |   +----> | RQ WQE Ring                                   |
-  |  - sq_dbr_ptr / rq_dbr_ptr           |   +----> | Doorbell Record Table                         |
-  |                                      |          |                                               |
-  | CQC Table                            | --+----> | CQE Ring                                      |
-  |  - cqe_buf_ptr / cq_dbr_ptr          |   +----> | Doorbell Record Table                         |
-  |                                      |          |                                               |
-  | EQC Table                            | --+----> | EQE Ring                                      |
-  |  - eqe_buf_ptr / eq_dbr_ptr          |   +----> | Doorbell Record Table                         |
-  |                                      |          |                                               |
-  | MPT/MKey Table                       | -------> | MTT/KLM Table                                 |
-  |  - translation_ptr                   |          | User Registered Memory Pages                  |
-  |                                      |          |                                               |
-  | PD Table / TIS Table                 |          |                                               |
-  +--------------------------------------+          +-----------------------------------------------+
-
-  +--------------------------------------+
-  | [BAR] PCIe BAR 映射区域              |
-  |--------------------------------------|
-  | UAR Page                             |
-  | BlueFlame Area                       |
-  | Doorbell MMIO Registers              |
-  +--------------------------------------+
+Legend:
+  [NIC]   CX5 NIC side: hardware context tables / ICM context / on-device resources
+  [DRAM]  Host CPU DRAM side: WQE/CQE/EQE/MTT/KLM/DBR/user pages
+  [BAR]   PCIe BAR mapped area: UAR / BlueFlame / Doorbell MMIO
+  <---|   Direct reference from a box border to the target text
+  --->    Association from a left-side NIC table to a right-side DRAM table/resource
+  ===>    Data flow / doorbell / packet / completion / event
 
 
 ====================================================================================================
-                                      1. PD 表
+                                      0. Table Location Overview
+====================================================================================================
+
+  NIC/BAR hardware-side tables are on the left; host DRAM-side tables/resources are on the right.
+
+  +--------------------------------------+      +------------------------------------------------+
+  | [NIC/BAR] Hardware-side resources    |      | [DRAM] Host memory tables/resources            |
+  |--------------------------------------|      |------------------------------------------------|
+  | QPC Table                            | ---> | SQ WQE Ring                                    |
+  |   sq_wq_ptr / rq_wq_ptr              | ---> | RQ WQE Ring                                    |
+  |   sq_dbr_ptr / rq_dbr_ptr            | ---> | Doorbell Record Table                          |
+  |                                      |      |                                                |
+  | CQC Table                            | ---> | CQE Ring                                       |
+  |   cqe_buf_ptr / cq_dbr_ptr           | ---> | Doorbell Record Table                          |
+  |                                      |      |                                                |
+  | EQC Table                            | ---> | EQE Ring                                       |
+  |   eqe_buf_ptr / eq_dbr_ptr           | ---> | Doorbell Record Table                          |
+  |                                      |      |                                                |
+  | MPT/MKey Table                       | ---> | MTT/KLM Table                                  |
+  |   translation_ptr                    |      | User Registered Memory Pages                   |
+  |                                      |      |                                                |
+  | PD Table / TIS Table                 |      |                                                |
+  |                                      |      |                                                |
+  | UAR / BlueFlame / Doorbell MMIO      |      |                                                |
+  +--------------------------------------+      +------------------------------------------------+
+
+
+====================================================================================================
+                                      1. PD Table
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -77,7 +71,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      2. TIS 表
+                                      2. TIS Table
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -96,45 +90,46 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      3. QPC 表及其关联图示
+                                      3. QPC Table and Linked WQE Rings
 ====================================================================================================
 
-  下图示例把 QPC 作为硬件侧表放在左边，把它直接关联的 DRAM WQE Ring 画在右边；QPC 字段行用字段名箭头接到右侧表。
+  The QPC hardware table is in the middle. Non-WQE references exit to the left; SQ/RQ WQE rings are drawn as right-side boxes.
+  QPC field names label the arrows that connect to the target tables.
 
-  +--------------------------------------------------------------------------------------------------+
-  | [NIC] QPC Table - Queue Pair Context Table                                                       |
-  |--------------------------------------------------------------------------------------------------|
-  | +------------------------------------------------+   [...]   +------------------+                 |
-  | | QPC_entry[0]                                   |           | QPC_entry[N]     |                 |
-  | | - qpn = 0                                      |           | - qpn = N         |                 |
-  | | - transport = RC / UC / UD / RAW               |           | - transport       |                 |
-  | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state           |                 |
-  | | - pdn                                          |           | - pdn             | <--- [NIC] PD Table (pdn)
-  | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attrs    |                 |
-  | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs      |                 |
-  | | - sq_wq_ptr                                    |           | - sq_wq_ptr       | -- sq_wq_ptr --> +-----------------------------------------------+
-  | |                                                |           |                  |                 |                  | [DRAM] SQ WQE Ring Table                       |
-  | |                                                |           |                  |                 |                  |-----------------------------------------------|
-  | |                                                |           |                  |                 |                  | SQ_WQE[0] ... SQ_WQE[N]                        |
-  | |                                                |           |                  |                 |                  | - opcode / local SGE / lkey                    |
-  | |                                                |           |                  |                 |                  +-----------------------------------------------+
-  | | - rq_wq_ptr                                    |           | - rq_wq_ptr       | -- rq_wq_ptr --> +-----------------------------------------------+
-  | |                                                |           |                  |                 |                  | [DRAM] RQ WQE Ring Table                       |
-  | |                                                |           |                  |                 |                  |-----------------------------------------------|
-  | |                                                |           |                  |                 |                  | RQ_WQE[0] ... RQ_WQE[N]                        |
-  | |                                                |           |                  |                 |                  | - receive SGE / lkey                           |
-  | |                                                |           |                  |                 |                  +-----------------------------------------------+
-  | | - send_cqn                                     |           | - send_cqn        | <--- [NIC] CQC Table (send_cqn)
-  | | - recv_cqn                                     |           | - recv_cqn        | <--- [NIC] CQC Table (recv_cqn)
-  | | - sq_dbr_ptr                                   |           | - sq_dbr_ptr      | <--- [DRAM] Doorbell Record Table (sq_dbr_ptr)
-  | | - rq_dbr_ptr                                   |           | - rq_dbr_ptr      | <--- [DRAM] Doorbell Record Table (rq_dbr_ptr)
-  | | - tisn                                         |           | - tisn            | <--- [NIC] TIS Table (tisn)
-  | +------------------------------------------------+           +------------------+                 |
-  +--------------------------------------------------------------------------------------------------+
+                                                          +--------------------------------------------------------------------------------------------------+
+                                                          | [NIC] QPC Table - Queue Pair Context Table                                                       |
+                                                          |--------------------------------------------------------------------------------------------------|
+                                                          | +------------------------------------------------+   [...]   +------------------+                |
+                                                          | | QPC_entry[0]                                   |           | QPC_entry[N]     |                |
+                                                          | | - qpn = 0                                      |           | - qpn = N        |                |
+                                                          | | - transport = RC / UC / UD / RAW               |           | - transport      |                |
+                                                          | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state          |                |
+  [NIC] PD Table (pdn)                                <---| | - pdn                                          |           | - pdn            |                |
+                                                          | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attr    |                |
+                                                          | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs     |                |
+                                                          | | - sq_wq_ptr                                    |           | - sq_wq_ptr      |                | -- sq_wq_ptr --> +-----------------------------------------------+
+                                                          | |                                                |           |                  |                |                  | [DRAM] SQ WQE Ring Table                      |
+                                                          | |                                                |           |                  |                |                  |-----------------------------------------------|
+                                                          | |                                                |           |                  |                |                  | SQ_WQE[0] ... SQ_WQE[N]                       |
+                                                          | |                                                |           |                  |                |                  | - opcode / local SGE / lkey                   |
+                                                          | |                                                |           |                  |                |                  +-----------------------------------------------+
+                                                          | | - rq_wq_ptr                                    |           | - rq_wq_ptr      |                | -- rq_wq_ptr --> +-----------------------------------------------+
+                                                          | |                                                |           |                  |                |                  | [DRAM] RQ WQE Ring Table                      |
+                                                          | |                                                |           |                  |                |                  |-----------------------------------------------|
+                                                          | |                                                |           |                  |                |                  | RQ_WQE[0] ... RQ_WQE[N]                       |
+                                                          | |                                                |           |                  |                |                  | - receive SGE / lkey                          |
+                                                          | |                                                |           |                  |                |                  +-----------------------------------------------+
+  [NIC] CQC Table (send_cqn)                          <---| | - send_cqn                                     |           | - send_cqn       |                |
+  [NIC] CQC Table (recv_cqn)                          <---| | - recv_cqn                                     |           | - recv_cqn       |                |
+  [DRAM] Doorbell Record Table (sq_dbr_ptr)           <---| | - sq_dbr_ptr                                   |           | - sq_dbr_ptr     |                |
+  [DRAM] Doorbell Record Table (rq_dbr_ptr)           <---| | - rq_dbr_ptr                                   |           | - rq_dbr_ptr     |                |
+  [NIC] TIS Table (tisn)                              <---| | - tisn                                         |           | - tisn           |                |
+                                                          | +------------------------------------------------+           +------------------+                |
+                                                          +--------------------------------------------------------------------------------------------------+
 
 
 ====================================================================================================
-                                      4. SQ 表：发送队列 WQE Ring
+                                      4. SQ Table: Send Queue WQE Ring
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -152,7 +147,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      5. RQ 表：接收队列 WQE Ring
+                                      5. RQ Table: Receive Queue WQE Ring
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -167,7 +162,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      6. MPT/MKey 表：内存保护与地址翻译入口
+                                      6. MPT/MKey Table: Memory Protection and Translation Entry
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -187,7 +182,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      7. MTT/KLM 表：物理页翻译表
+                                      7. MTT/KLM Table: Physical Page Translation Table
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -202,7 +197,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      8. 用户注册数据页
+                                      8. User Registered Memory Pages
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -216,7 +211,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      9. CQC 表及其左边界出线
+                                      9. CQC Table and Left-Border Exits
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -235,7 +230,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      10. CQE 表：完成队列 Entry Ring
+                                      10. CQE Table: Completion Queue Entry Ring
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -252,7 +247,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      11. EQC 表及其左边界出线
+                                      11. EQC Table and Left-Border Exits
 ====================================================================================================
 
                                                         +----------------------------------------------------------------------------------+
@@ -270,7 +265,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      12. EQE 表：事件队列 Entry Ring
+                                      12. EQE Table: Event Queue Entry Ring
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -285,7 +280,7 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      13. Doorbell Record 表
+                                      13. Doorbell Record Table
 ====================================================================================================
 
                  +----------------------------------------------------------------------------------+
@@ -320,10 +315,10 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                         15. 一条 RC QP 的 SEND / WRITE / READ 硬件资源链
+                         15. Hardware Resource Chain for RC QP SEND / WRITE / READ
 ====================================================================================================
 
-CPU writes WQE in DRAM and rings BAR doorbell. 硬件侧表放左边，关联的 DRAM 表/资源放右边：
+CPU writes WQE in DRAM and rings BAR doorbell. Hardware-side tables are on the left; related DRAM resources are on the right:
 
   +-------------------------------+                         +--------------------------------------+
   | [BAR] UAR / BlueFlame         | === doorbell/MMIO ===>  | [NIC] QPC / SQ scheduler             |
