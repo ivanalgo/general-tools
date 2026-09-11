@@ -9,21 +9,19 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 画法约定：
   - 每张表都画成：entry[0] -> [...] -> entry[N]。
-  - 指向其它表的 field，不在表内部横向穿线；统一从“框图左边界”出线。
+  - 指向其它表/资源的 field，不在表内部横向穿线；统一从“框图左边界”直接出线。
   - 形式如下：
 
-        field_name <---| | - field_name
-                 |     | ... table body ...
-                 +---> target table
+        target table/resource (field_name)   <---| | - field_name
 
-    即：field 所在行从表格左边界拉出；左侧出线后向下折，再横向指向目标表。
+    即：field 所在行从表格左边界拉出，左侧直接写它关联到的目标表/资源；不再在表格下方画折线。
 
 图例：
   [NIC]   CX5 NIC 硬件侧：硬件上下文表 / ICM context / 片上硬件资源
   [DRAM]  主机 CPU DRAM 侧：WQE/CQE/EQE/MTT/KLM/DBR/用户数据页
   [BAR]   PCIe BAR 映射区域：UAR / BlueFlame / Doorbell MMIO
-  <---|   从框图左边界引出线
-  +--->   下折后指向目标表
+  <---|   从框图左边界直接引出到左侧目标说明
+  --->    NIC 左侧硬件表到右侧 DRAM 表/资源的关联箭头
   ===>    数据流 / doorbell / packet / completion / event
 
 
@@ -31,17 +29,26 @@ ConnectX-5 RDMA 硬件资源表全景大图
                                       0. 表位置总览
 ====================================================================================================
 
-  +--------------------------------------+      +-----------------------------------------------+
-  | [NIC] CX5 硬件侧上下文表             |      | [DRAM] 主机 CPU 内存侧表                       |
-  |--------------------------------------|      |-----------------------------------------------|
-  | PD Table                             |      | SQ WQE Ring                                   |
-  | QPC Table                            |      | RQ WQE Ring                                   |
-  | CQC Table                            |      | CQE Ring                                      |
-  | EQC Table                            |      | EQE Ring                                      |
-  | MPT/MKey Table                       |      | MTT/KLM Table                                 |
-  | TIS Table                            |      | Doorbell Record Table                         |
-  |                                      |      | User Registered Memory Pages                  |
-  +--------------------------------------+      +-----------------------------------------------+
+  NIC / BAR 硬件侧表放左边，主机 DRAM 侧表放右边；箭头表示硬件上下文里的指针/编号关联。
+
+  +--------------------------------------+          +-----------------------------------------------+
+  | [NIC] CX5 硬件侧上下文表             |          | [DRAM] 主机 CPU 内存侧表                       |
+  |--------------------------------------|          |-----------------------------------------------|
+  | QPC Table                            | --+----> | SQ WQE Ring                                   |
+  |  - sq_wq_ptr / rq_wq_ptr             |   +----> | RQ WQE Ring                                   |
+  |  - sq_dbr_ptr / rq_dbr_ptr           |   +----> | Doorbell Record Table                         |
+  |                                      |          |                                               |
+  | CQC Table                            | --+----> | CQE Ring                                      |
+  |  - cqe_buf_ptr / cq_dbr_ptr          |   +----> | Doorbell Record Table                         |
+  |                                      |          |                                               |
+  | EQC Table                            | --+----> | EQE Ring                                      |
+  |  - eqe_buf_ptr / eq_dbr_ptr          |   +----> | Doorbell Record Table                         |
+  |                                      |          |                                               |
+  | MPT/MKey Table                       | -------> | MTT/KLM Table                                 |
+  |  - translation_ptr                   |          | User Registered Memory Pages                  |
+  |                                      |          |                                               |
+  | PD Table / TIS Table                 |          |                                               |
+  +--------------------------------------+          +-----------------------------------------------+
 
   +--------------------------------------+
   | [BAR] PCIe BAR 映射区域              |
@@ -65,11 +72,8 @@ ConnectX-5 RDMA 硬件资源表全景大图
                  | | - protection domain  |                   | - protection domain  |              |
                  | +----------------------+                   +----------------------+              |
                  +----------------------------------------------------------------------------------+
-                   ^
-                   |
-                   +--- referenced by QPC.pdn
-                   |
-                   +--- referenced by MPT.pdn
+
+  Referenced by: QPC.pdn, MPT.pdn
 
 
 ====================================================================================================
@@ -87,9 +91,8 @@ ConnectX-5 RDMA 硬件资源表全景大图
                  | | - RoCE send attrs    |                   | - RoCE send attrs    |              |
                  | +----------------------+                   +----------------------+              |
                  +----------------------------------------------------------------------------------+
-                   ^
-                   |
-                   +--- referenced by QPC.tisn
+
+  Referenced by: QPC.tisn
 
 
 ====================================================================================================
@@ -122,91 +125,68 @@ ConnectX-5 RDMA 硬件资源表全景大图
                                       4. SQ 表：发送队列 WQE Ring
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [DRAM] SQ WQE Ring Table - Send Queue Work Queue Entries                         |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | SQ_WQE[0]                                      |           | SQ_WQE[N]        | |
-                 | | - opcode = SEND / RDMA_WRITE / RDMA_READ       |           | - opcode          | |
-                 | | - local SGE addr / len                         |           | - local SGE       | |
-lkey         <---| | - lkey                                         |           | - lkey            | |
-remote_key   <---| | - remote_addr / rkey for RDMA READ/WRITE       |           | - remote addr/key | |
-                 | | - ctrl segment / data segment / inline         |           | - ctrl/data       | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |    |
-                 | |    +---> remote packet carries rkey/address
-                 | |              |
-                 | |              +===> remote CX5 checks remote [NIC] MPT/MKey Table
-                 | |
-                 | +----------> [NIC] MPT/MKey Table
-                                  |
-                                  | local lkey translation for DMA read/write
-                                  v
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [DRAM] SQ WQE Ring Table - Send Queue Work Queue Entries                         |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | SQ_WQE[0]                                      |           | SQ_WQE[N]        | |
+                                                        | | - opcode = SEND / RDMA_WRITE / RDMA_READ       |           | - opcode          | |
+                                                        | | - local SGE addr / len                         |           | - local SGE       | |
+[NIC] MPT/MKey Table (local lkey)                   <---| | - lkey                                         |           | - lkey            | |
+[wire -> remote NIC MPT/MKey Table (rkey/address)]  <---| | - remote_addr / rkey for RDMA READ/WRITE       |           | - remote addr/key | |
+                                                        | | - ctrl segment / data segment / inline         |           | - ctrl/data       | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
                                       5. RQ 表：接收队列 WQE Ring
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [DRAM] RQ WQE Ring Table - Receive Queue Work Queue Entries                      |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | RQ_WQE[0]                                      |           | RQ_WQE[N]        | |
-                 | | - receive SGE addr / len                       |           | - receive SGE     | |
-lkey         <---| | - lkey                                         |           | - lkey            | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |
-                 | +----------> [NIC] MPT/MKey Table
-                                  |
-                                  | posted receive buffer translation
-                                  v
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [DRAM] RQ WQE Ring Table - Receive Queue Work Queue Entries                      |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | RQ_WQE[0]                                      |           | RQ_WQE[N]        | |
+                                                        | | - receive SGE addr / len                       |           | - receive SGE     | |
+[NIC] MPT/MKey Table (posted receive lkey)          <---| | - lkey                                         |           | - lkey            | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
                                       6. MPT/MKey 表：内存保护与地址翻译入口
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [NIC] MPT/MKey Table - Memory Protection / Memory Key Context Table              |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | MPT_entry[0]                                   |           | MPT_entry[N]     | |
-                 | | - mkey/lkey = 0                                |           | - mkey/lkey = N  | |
-pdn          <---| | - pdn                                          |           | - pdn             | |
-                 | | - access: local/remote read/write/atomic       |           | - access flags    | |
-                 | | - iova / base_addr                             |           | - iova/base_addr  | |
-                 | | - length                                       |           | - length          | |
-                 | | - page_size                                    |           | - page_size       | |
-translation  <---| | - translation_ptr                              |           | - translation_ptr | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |    |
-                 | |    +-------> [DRAM] MTT/KLM Table
-                 | |
-                 | +------------> [NIC]  PD Table
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [NIC] MPT/MKey Table - Memory Protection / Memory Key Context Table              |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | MPT_entry[0]                                   |           | MPT_entry[N]     | |
+                                                        | | - mkey/lkey = 0                                |           | - mkey/lkey = N  | |
+[NIC] PD Table (pdn)                                <---| | - pdn                                          |           | - pdn             | |
+                                                        | | - access: local/remote read/write/atomic       |           | - access flags    | |
+                                                        | | - iova / base_addr                             |           | - iova/base_addr  | |
+                                                        | | - length                                       |           | - length          | |
+                                                        | | - page_size                                    |           | - page_size       | |
+[DRAM] MTT/KLM Table (translation_ptr)              <---| | - translation_ptr                              |           | - translation_ptr | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
                                       7. MTT/KLM 表：物理页翻译表
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [DRAM] MTT/KLM Table - Memory Translation Table / KLM Indirect Table             |
-                 |----------------------------------------------------------------------------------|
-                 | +----------------------+       [...]       +----------------------+              |
-                 | | MTT/KLM_entry[0]     |                   | MTT/KLM_entry[N]     |              |
-dma_pa       <---| | - dma_pa/page_pa     |                   | - dma_pa/page_pa     |              |
-                 | | - len / perms        |                   | - len / perms        |              |
-                 | +----------------------+                   +----------------------+              |
-                 +----------------------------------------------------------------------------------+
-                 | |
-                 | +----------> [DRAM] User Registered Memory Pages
-                                  |
-                                  | DMA physical address
-                                  v
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [DRAM] MTT/KLM Table - Memory Translation Table / KLM Indirect Table             |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +----------------------+       [...]       +----------------------+              |
+                                                        | | MTT/KLM_entry[0]     |                   | MTT/KLM_entry[N]     |              |
+[DRAM] User Registered Memory Pages (dma_pa)        <---| | - dma_pa/page_pa     |                   | - dma_pa/page_pa     |              |
+                                                        | | - len / perms        |                   | - len / perms        |              |
+                                                        | +----------------------+                   +----------------------+              |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
@@ -227,28 +207,19 @@ dma_pa       <---| | - dma_pa/page_pa     |                   | - dma_pa/page_pa
                                       9. CQC 表及其左边界出线
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [NIC] CQC Table - Completion Queue Context Table                                  |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | CQC_entry[0]                                   |           | CQC_entry[N]     | |
-                 | | - cqn = 0                                      |           | - cqn = N         | |
-                 | | - cq_size / log_cq_size                        |           | - cq_size         | |
-cqe_buf_ptr  <---| | - cqe_buf_ptr                                  |           | - cqe_buf_ptr     | |
-cq_dbr_ptr   <---| | - cq_dbr_ptr                                   |           | - cq_dbr_ptr      | |
-eqn          <---| | - eqn                                          |           | - eqn             | |
-                 | | - arm state / moderation / period / count      |           | - moderation      | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |    |    |
-                 | |    |    +-------> [NIC]  EQC Table
-                 | |    |
-                 | |    +------------> [DRAM] Doorbell Record Table
-                 | |
-                 | +-----------------> [DRAM] CQE Ring Table
-                                      |
-                                      | hardware writes completion entries
-                                      v
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [NIC] CQC Table - Completion Queue Context Table                                  |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | CQC_entry[0]                                   |           | CQC_entry[N]     | |
+                                                        | | - cqn = 0                                      |           | - cqn = N         | |
+                                                        | | - cq_size / log_cq_size                        |           | - cq_size         | |
+[DRAM] CQE Ring Table (cqe_buf_ptr)                 <---| | - cqe_buf_ptr                                  |           | - cqe_buf_ptr     | |
+[DRAM] Doorbell Record Table (cq_dbr_ptr)           <---| | - cq_dbr_ptr                                   |           | - cq_dbr_ptr      | |
+[NIC] EQC Table (eqn)                               <---| | - eqn                                          |           | - eqn             | |
+                                                        | | - arm state / moderation / period / count      |           | - moderation      | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
@@ -272,25 +243,18 @@ eqn          <---| | - eqn                                          |           
                                       11. EQC 表及其左边界出线
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [NIC] EQC Table - Event Queue Context Table                                       |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | EQC_entry[0]                                   |           | EQC_entry[N]     | |
-                 | | - eqn = 0                                      |           | - eqn = N         | |
-eqe_buf_ptr  <---| | - eqe_buf_ptr                                  |           | - eqe_buf_ptr     | |
-eq_dbr_ptr   <---| | - eq_dbr_ptr                                   |           | - eq_dbr_ptr      | |
-                 | | - msix_vector                                  |           | - msix_vector     | |
-                 | | - event mask / interrupt moderation            |           | - event attrs     | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |    |
-                 | |    +-------> [DRAM] Doorbell Record Table
-                 | |
-                 | +------------> [DRAM] EQE Ring Table
-                                |
-                                | hardware writes async/completion events
-                                v
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [NIC] EQC Table - Event Queue Context Table                                       |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | EQC_entry[0]                                   |           | EQC_entry[N]     | |
+                                                        | | - eqn = 0                                      |           | - eqn = N         | |
+[DRAM] EQE Ring Table (eqe_buf_ptr)                 <---| | - eqe_buf_ptr                                  |           | - eqe_buf_ptr     | |
+[DRAM] Doorbell Record Table (eq_dbr_ptr)           <---| | - eq_dbr_ptr                                   |           | - eq_dbr_ptr      | |
+                                                        | | - msix_vector                                  |           | - msix_vector     | |
+                                                        | | - event mask / interrupt moderation            |           | - event attrs     | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
@@ -322,123 +286,85 @@ eq_dbr_ptr   <---| | - eq_dbr_ptr                                   |           
                  | | - EQ consumer index                            |           | - eq index value  | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   ^                         ^                         ^
-                   |                         |                         |
-                   +--- QPC.sq_dbr_ptr       +--- CQC.cq_dbr_ptr       +--- EQC.eq_dbr_ptr
-                   |
-                   +--- QPC.rq_dbr_ptr
+
+  Referenced by: QPC.sq_dbr_ptr, QPC.rq_dbr_ptr, CQC.cq_dbr_ptr, EQC.eq_dbr_ptr
 
 
 ====================================================================================================
                                       14. UAR / BlueFlame / Doorbell BAR
 ====================================================================================================
 
-                 +----------------------------------------------------------------------------------+
-                 | [BAR] UAR / BlueFlame / Doorbell Page - PCIe BAR Mapped MMIO                     |
-                 |----------------------------------------------------------------------------------|
-                 | +------------------------------------------------+   [...]   +------------------+ |
-                 | | UAR_page[0]                                    |           | UAR_page[N]      | |
-sq_db        <---| | - SQ doorbell register                          |           | - SQ doorbell     | |
-cq_arm_db    <---| | - CQ arm doorbell register                      |           | - CQ arm doorbell | |
-eq_db        <---| | - EQ doorbell register                          |           | - EQ doorbell     | |
-blueflame    <---| | - BlueFlame write-combining area                |           | - BlueFlame area  | |
-                 | +------------------------------------------------+           +------------------+ |
-                 +----------------------------------------------------------------------------------+
-                 | |    |    |    |
-                 | |    |    |    +====> [NIC] inline WQE ingestion
-                 | |    |    +=========> [NIC] EQC event logic
-                 | |    +==============> [NIC] CQC arm logic
-                 | +===================> [NIC] QPC / SQ scheduler
+                                                        +----------------------------------------------------------------------------------+
+                                                        | [BAR] UAR / BlueFlame / Doorbell Page - PCIe BAR Mapped MMIO                     |
+                                                        |----------------------------------------------------------------------------------|
+                                                        | +------------------------------------------------+   [...]   +------------------+ |
+                                                        | | UAR_page[0]                                    |           | UAR_page[N]      | |
+[NIC] QPC / SQ scheduler (sq_db)                    <---| | - SQ doorbell register                          |           | - SQ doorbell     | |
+[NIC] CQC arm logic (cq_arm_db)                     <---| | - CQ arm doorbell register                      |           | - CQ arm doorbell | |
+[NIC] EQC event logic (eq_db)                       <---| | - EQ doorbell register                          |           | - EQ doorbell     | |
+[NIC] inline WQE ingestion (blueflame)              <---| | - BlueFlame write-combining area                |           | - BlueFlame area  | |
+                                                        | +------------------------------------------------+           +------------------+ |
+                                                        +----------------------------------------------------------------------------------+
 
 
 ====================================================================================================
                          15. 一条 RC QP 的 SEND / WRITE / READ 硬件资源链
 ====================================================================================================
 
-CPU writes WQE in DRAM and rings BAR doorbell:
+CPU writes WQE in DRAM and rings BAR doorbell. 硬件侧表放左边，关联的 DRAM 表/资源放右边：
 
-       [BAR] UAR / BlueFlame
-             |
-             | doorbell MMIO
-             v
-       [NIC] QPC Table
-             |
-sq_wq_ptr <--|   field exits from the left side of QPC box
-             |
-             +-----> [DRAM] SQ WQE Ring Table
-             |           |
-lkey     <---|           | field exits from the left side of SQ WQE box
-             |           |
-             |           +-----> [NIC] MPT/MKey Table
-             |                       |
-trans    <---|                       | field exits from the left side of MPT box
-             |                       |
-             |                       +-----> [DRAM] MTT/KLM Table
-             |                                   |
-dma_pa   <---|                                   | field exits from the left side of MTT/KLM box
-             |                                   |
-             |                                   +-----> [DRAM] User Registered Memory Pages
-             |
-rq_wq_ptr <--|
-             |
-             +-----> [DRAM] RQ WQE Ring Table
-             |           |
-lkey     <---|           |
-             |           +-----> [NIC] MPT/MKey Table
-             |
-cqn      <---|
-             |
-             +-----> [NIC] CQC Table
-             |           |
-cqe_ptr  <---|           |
-             |           +-----> [DRAM] CQE Ring Table
-             |           |
-eqn      <---|           |
-             |           +-----> [NIC] EQC Table
-             |                       |
-eqe_ptr  <---|                       |
-             |                       +-----> [DRAM] EQE Ring Table
-             |
-pdn      <---|
-             |
-             +-----> [NIC] PD Table
-             |
-tisn     <---|
-             |
-             +-----> [NIC] TIS Table
-             |
-dbr_ptr  <---|
-             |
-             +-----> [DRAM] Doorbell Record Table
+  +-------------------------------+                         +--------------------------------------+
+  | [BAR] UAR / BlueFlame         | === doorbell/MMIO ===>  | [NIC] QPC / SQ scheduler             |
+  +-------------------------------+                         +--------------------------------------+
 
+  +--------------------------------------+                  +-----------------------------------------------+
+  | [NIC] QPC Table                      | -- sq_wq_ptr --> | [DRAM] SQ WQE Ring Table                       |
+  |  - qpn / transport / state           | -- rq_wq_ptr --> | [DRAM] RQ WQE Ring Table                       |
+  |  - sq_dbr_ptr / rq_dbr_ptr           | ---------------> | [DRAM] Doorbell Record Table                   |
+  |                                      |                  |                                               |
+  |  NIC-side references:                |                  |                                               |
+  |    pdn       -> [NIC] PD Table       |                  |                                               |
+  |    send_cqn  -> [NIC] CQC Table      |                  |                                               |
+  |    recv_cqn  -> [NIC] CQC Table      |                  |                                               |
+  |    tisn      -> [NIC] TIS Table      |                  |                                               |
+  +--------------------------------------+                  +-----------------------------------------------+
+
+  +--------------------------------------+                  +-----------------------------------------------+
+  | [NIC] CQC Table                      | -- cqe_buf_ptr ->| [DRAM] CQE Ring Table                          |
+  |  - cq_dbr_ptr                        | ---------------> | [DRAM] Doorbell Record Table                   |
+  |                                      |                  |                                               |
+  |  NIC-side reference:                 |                  |                                               |
+  |    eqn -> [NIC] EQC Table            |                  |                                               |
+  +--------------------------------------+                  +-----------------------------------------------+
+
+  +--------------------------------------+                  +-----------------------------------------------+
+  | [NIC] EQC Table                      | -- eqe_buf_ptr ->| [DRAM] EQE Ring Table                          |
+  |  - eq_dbr_ptr                        | ---------------> | [DRAM] Doorbell Record Table                   |
+  +--------------------------------------+                  +-----------------------------------------------+
+
+  +--------------------------------------+                  +-----------------------------------------------+
+  | [NIC] MPT/MKey Table                 | -- translation ->| [DRAM] MTT/KLM Table                           |
+  |  - pdn -> [NIC] PD Table             |                  |  - dma_pa/page_pa --> User Registered Pages    |
+  +--------------------------------------+                  +-----------------------------------------------+
 
 RDMA WRITE / RDMA READ remote memory authorization path:
 
-       Local [DRAM] SQ_WQE
-             |
-remote   <---|  remote_addr / rkey field exits from the left side of SQ WQE box
-             |
-             +====> Packet on wire
-                        |
-                        | arrives at remote CX5 NIC
-                        v
-                    Remote [NIC] QPC Table
-                        |
-                        | checks QP state / transport / PSN / remote_qpn / path
-                        v
-                    Remote [NIC] MPT/MKey Table
-                        |
-rkey     <--------------|  rkey lookup
-                        |
-                        +-----> checks PD / access / iova / length
-                        |
-trans    <--------------|  translation_ptr
-                        |
-                        +-----> Remote [DRAM] MTT/KLM Table
-                                    |
-dma_pa   <-------------------------|  dma_pa/page_pa
-                                    |
-                                    +-----> Remote [DRAM] User Registered Memory Pages
+  Local side:                                                Remote side:
+  +--------------------------------------+                  +-----------------------------------------------+
+  | [DRAM] SQ_WQE                        | === packet ===>  | [NIC] QPC Table                                |
+  |  - remote_addr / rkey                |                  |  checks QP state / transport / PSN / path      |
+  +--------------------------------------+                  +-----------------------------------------------+
+                                                                    |
+                                                                    v
+                                                            +-----------------------------------------------+
+                                                            | [NIC] MPT/MKey Table                           |
+                                                            |  checks rkey / PD / access / iova / length     |
+                                                            +-----------------------------------------------+
+                                                                    |
+                                                                    v
+                                                            +-----------------------------------------------+
+                                                            | [DRAM] MTT/KLM -> User Memory Pages            |
+                                                            +-----------------------------------------------+
 
 
 ====================================================================================================
