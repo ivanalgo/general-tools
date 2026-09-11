@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,13 +34,34 @@ void rdma_resources_init(struct rdma_resources *res, int verbose)
 {
     memset(res, 0, sizeof(*res));
     res->verbose = verbose;
+    res->cm_timeout_ms = RDMA_DEMO_DEFAULT_CM_TIMEOUT_MS;
+}
+
+void rdma_resources_set_cm_timeout(struct rdma_resources *res, int timeout_ms)
+{
+    res->cm_timeout_ms = timeout_ms > 0 ? timeout_ms : RDMA_DEMO_DEFAULT_CM_TIMEOUT_MS;
 }
 
 static int wait_cm_event(struct rdma_event_channel *ec,
                          enum rdma_cm_event_type expect,
+                         int timeout_ms,
                          struct rdma_cm_event **out)
 {
     struct rdma_cm_event *ev = NULL;
+
+    struct pollfd pfd;
+    memset(&pfd, 0, sizeof(pfd));
+    pfd.fd = ec->fd;
+    pfd.events = POLLIN;
+    int prc = poll(&pfd, 1, timeout_ms);
+    if (prc == 0) {
+        fprintf(stderr, "timeout waiting for RDMA CM event %s after %d ms\n",
+                rdma_event_str(expect), timeout_ms);
+        return -1;
+    }
+    if (prc < 0) {
+        return die_errno("poll(RDMA CM event channel)");
+    }
 
     /*
      * rdma_get_cm_event() 从 RDMA CM event channel 取连接管理事件。
@@ -254,7 +276,10 @@ int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog
 int rdma_server_accept_one(struct rdma_resources *res, size_t data_size, int cq_depth)
 {
     struct rdma_cm_event *ev = NULL;
-    if (wait_cm_event(res->ec, RDMA_CM_EVENT_CONNECT_REQUEST, &ev) != 0) {
+    printf("server waiting for RDMA CM connect request (timeout %d ms)\n",
+           res->cm_timeout_ms);
+    if (wait_cm_event(res->ec, RDMA_CM_EVENT_CONNECT_REQUEST,
+                      res->cm_timeout_ms, &ev) != 0) {
         return -1;
     }
     res->id = ev->id;
@@ -280,7 +305,8 @@ int rdma_server_accept_one(struct rdma_resources *res, size_t data_size, int cq_
     if (rdma_accept(res->id, &param) != 0) {
         return die_errno("rdma_accept");
     }
-    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ESTABLISHED, &ev) != 0) {
+    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ESTABLISHED,
+                      res->cm_timeout_ms, &ev) != 0) {
         return -1;
     }
     if (ack_cm_event(ev) != 0) {
@@ -319,14 +345,17 @@ int rdma_client_connect(struct rdma_resources *res, const char *addr, const char
      * rdma_resolve_addr() 根据目标 IP 选择本地 RDMA 设备/GID/源地址。
      * Soft-RoCE 场景会按 IP 路由映射到 rxe 设备；这是“同机两个 rxe 设备”测试的关键。
      */
-    if (rdma_resolve_addr(res->id, NULL, dst->ai_addr, 2000) != 0) {
+    printf("client resolving RDMA address %s:%s (timeout %d ms)\n",
+           addr, port, res->cm_timeout_ms);
+    if (rdma_resolve_addr(res->id, NULL, dst->ai_addr, res->cm_timeout_ms) != 0) {
         freeaddrinfo(dst);
         return die_errno("rdma_resolve_addr");
     }
     freeaddrinfo(dst);
 
     struct rdma_cm_event *ev = NULL;
-    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ADDR_RESOLVED, &ev) != 0) {
+    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ADDR_RESOLVED,
+                      res->cm_timeout_ms, &ev) != 0) {
         return -1;
     }
     if (ack_cm_event(ev) != 0) {
@@ -334,10 +363,12 @@ int rdma_client_connect(struct rdma_resources *res, const char *addr, const char
     }
 
     /* rdma_resolve_route() 解析 RDMA 路径；硬件相关路径属性将用于后续 QPC。 */
-    if (rdma_resolve_route(res->id, 2000) != 0) {
+    printf("client resolving RDMA route\n");
+    if (rdma_resolve_route(res->id, res->cm_timeout_ms) != 0) {
         return die_errno("rdma_resolve_route");
     }
-    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ROUTE_RESOLVED, &ev) != 0) {
+    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ROUTE_RESOLVED,
+                      res->cm_timeout_ms, &ev) != 0) {
         return -1;
     }
     if (ack_cm_event(ev) != 0) {
@@ -360,10 +391,12 @@ int rdma_client_connect(struct rdma_resources *res, const char *addr, const char
      * 硬件视角：驱动根据 CM 路由信息填充 QPC，并在连接建立后让 RC QP 进入 RTS；
      * 此后 SQ doorbell 触发 HCA 发送包，RQ 接收对端 SEND。
      */
+    printf("client connecting; make sure server is already running on %s:%s\n", addr, port);
     if (rdma_connect(res->id, &param) != 0) {
         return die_errno("rdma_connect");
     }
-    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ESTABLISHED, &ev) != 0) {
+    if (wait_cm_event(res->ec, RDMA_CM_EVENT_ESTABLISHED,
+                      res->cm_timeout_ms, &ev) != 0) {
         return -1;
     }
     if (ack_cm_event(ev) != 0) {

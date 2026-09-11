@@ -62,6 +62,7 @@ void print_usage(const char *prog)
             "  -n, --iters N         iterations per selected operation, default 10\n"
             "      --gid-index N     selftest GID index, default 0; RDMA CM mode uses route-selected GID\n"
             "      --cq-depth N      CQ/SQ/RQ depth, default 64\n"
+            "      --cm-timeout-ms N RDMA CM event timeout, default 5000 ms\n"
             "      --dev-a NAME      selftest initiator RDMA device\n"
             "      --dev-b NAME      selftest responder RDMA device\n"
             "  -v, --verbose         print progress for every operation\n"
@@ -81,6 +82,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         .gid_index = -1,
         .cq_depth = 64,
         .verbose = 0,
+        .cm_timeout_ms = RDMA_DEMO_DEFAULT_CM_TIMEOUT_MS,
         .dev_a = NULL,
         .dev_b = NULL,
     };
@@ -98,6 +100,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         {"cq-depth", required_argument, NULL, 1001},
         {"dev-a", required_argument, NULL, 1003},
         {"dev-b", required_argument, NULL, 1004},
+        {"cm-timeout-ms", required_argument, NULL, 1005},
         {"verbose", no_argument, NULL, 'v'},
         {"help", no_argument, NULL, 'h'},
         {NULL, 0, NULL, 0},
@@ -128,6 +131,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         case 1001: opt->cq_depth = atoi(optarg); break;
         case 1003: opt->dev_a = optarg; break;
         case 1004: opt->dev_b = optarg; break;
+        case 1005: opt->cm_timeout_ms = atoi(optarg); break;
         case 'v': opt->verbose++; break;
         case 'h': print_usage(argv[0]); exit(0);
         default: return -1;
@@ -144,6 +148,10 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
     }
     if (opt->iters <= 0 || opt->cq_depth < 8) {
         fprintf(stderr, "--iters must be > 0 and --cq-depth must be >= 8\n");
+        return -1;
+    }
+    if (opt->cm_timeout_ms <= 0) {
+        fprintf(stderr, "--cm-timeout-ms must be > 0\n");
         return -1;
     }
     if (opt->size > RDMA_DEMO_MAX_PAYLOAD) {

@@ -133,6 +133,18 @@ SHOW_IBV_WARNINGS=1 ./scripts/run_local_test.sh
 
 注意：server/client 模式使用 RDMA CM。在一台机器的同一个 network namespace 内连接本机另一个 IP 时，Linux 可能通过 `local/lo` 路由处理地址，导致 RDMA CM 地址解析不选择 RXE 设备。此时推荐使用上面的 `--selftest` 完成本机双 RXE 设备验证；跨两台机器或具备正确 RDMA netns 隔离时再使用 server/client 模式。
 
+如果只启动 client 而没有先启动 server，client 会在 RDMA CM 连接阶段等待/失败。可以用 `--cm-timeout-ms` 缩短等待时间并看到明确错误，例如：
+
+```bash
+./rdma_demo --client --addr 192.168.130.2 --port 7471 --mode all --cm-timeout-ms 1500
+```
+
+在同机当前 namespace 中可用下面命令确认 `192.168.130.2` 是否被内核识别成本地地址；如果输出包含 `local ... dev lo`，说明 RDMA CM server/client 模式不适合用这个拓扑验证，请使用 `--selftest`：
+
+```bash
+ip route get 192.168.130.2
+```
+
 预期输出类似：
 
 ```text
@@ -152,6 +164,7 @@ server done: send=3 write=3 read=3
 --size SIZE               每次操作的数据长度，支持 K/M 后缀；当前 SEND 控制缓冲最大约 3.9KiB
 --iters N                 每种模式迭代次数，默认 10
 --cq-depth N              CQ/SQ/RQ 深度，默认 64
+--cm-timeout-ms N         RDMA CM 事件等待超时，默认 5000 ms
 --gid-index N             selftest 使用的 GID index，默认 0；RDMA CM 模式按路由选择 GID
 --selftest                单进程 verbs 自测模式，不依赖 RDMA CM
 --dev-a NAME              selftest 发起端 RDMA 设备名

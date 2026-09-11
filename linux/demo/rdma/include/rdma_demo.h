@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #define RDMA_DEMO_DEFAULT_PORT "7471"
+#define RDMA_DEMO_DEFAULT_CM_TIMEOUT_MS 5000
 #define RDMA_DEMO_MAX_INLINE 220
 #define RDMA_DEMO_CTRL_SIZE 4096
 #define RDMA_DEMO_MAX_PAYLOAD (RDMA_DEMO_CTRL_SIZE - sizeof(struct demo_msg))
@@ -43,6 +44,7 @@ struct demo_options {
     int gid_index;
     int cq_depth;
     int verbose;
+    int cm_timeout_ms;
     const char *dev_a;
     const char *dev_b;
 };
@@ -75,6 +77,7 @@ struct rdma_resources {
     uint64_t peer_addr;
     uint32_t peer_rkey;
     int verbose;
+    int cm_timeout_ms;
 };
 
 int parse_options(int argc, char **argv, struct demo_options *opt);
@@ -90,6 +93,7 @@ int run_client(const struct demo_options *opt);
 int run_verbs_selftest(const struct demo_options *opt);
 
 void rdma_resources_init(struct rdma_resources *res, int verbose);
+void rdma_resources_set_cm_timeout(struct rdma_resources *res, int timeout_ms);
 void rdma_resources_cleanup(struct rdma_resources *res);
 int rdma_server_listen(struct rdma_resources *res, const char *port, int backlog);
 int rdma_server_accept_one(struct rdma_resources *res, size_t data_size, int cq_depth);
