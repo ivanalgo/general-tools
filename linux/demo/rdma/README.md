@@ -99,6 +99,15 @@ cd linux/demo/rdma
 
 默认一键测试使用 `--selftest`，即在同一个进程内创建两个 verbs 端点，分别打开 `rxe_demo0` / `rxe_demo1`，手工迁移 QP 到 RTS，然后依次完整测试 `send`、`write`、`read`、`all` 四个 case。
 
+脚本会显式指定并校验两端使用不同的 IP、eth netdev 和 RDMA NIC，默认映射为：
+
+```text
+client: ip=192.168.130.1 netdev=rdma-veth0 rdma=rxe_demo0
+server: ip=192.168.130.2 netdev=rdma-veth1 rdma=rxe_demo1
+```
+
+如果 client/server IP 相同、RDMA NIC 相同，或 RDMA NIC 没有绑定到预期 netdev，脚本会直接失败退出，避免误共用同一个 RDMA 网卡。
+
 每个 case 都不是“只创建资源”：
 
 - `send`：A 端 `IBV_WR_SEND`，B 端预投递 RQ WQE 接收，并校验接收 buffer 的 pattern。
@@ -111,7 +120,10 @@ cd linux/demo/rdma
 可以通过环境变量调整参数：
 
 ```bash
-SIZE=2048 ITERS=5 DEV_A=rxe_demo0 DEV_B=rxe_demo1 GID_INDEX=0 ./scripts/run_local_test.sh
+SIZE=2048 ITERS=5 \
+CLIENT_IP=192.168.130.1 CLIENT_NETDEV=rdma-veth0 CLIENT_RDMA_DEV=rxe_demo0 \
+SERVER_IP=192.168.130.2 SERVER_NETDEV=rdma-veth1 SERVER_RDMA_DEV=rxe_demo1 \
+GID_INDEX=0 ./scripts/run_local_test.sh
 ```
 
 只运行部分 case：
@@ -130,7 +142,7 @@ SHOW_IBV_WARNINGS=1 ./scripts/run_local_test.sh
 也可以直接运行：
 
 ```bash
-./rdma_demo --selftest --dev-a rxe_demo0 --dev-b rxe_demo1 --mode all --size 1024 --iters 3 --gid-index 0
+./rdma_demo --selftest --client-dev rxe_demo0 --server-dev rxe_demo1 --mode all --size 1024 --iters 3 --gid-index 0
 ```
 
 ### 手工启动 server/client
@@ -190,6 +202,8 @@ server done: send=3 write=3 read=3
 --cm-timeout-ms N         RDMA CM 事件等待超时，默认 5000 ms
 --gid-index N             selftest 使用的 GID index，默认 0；RDMA CM 模式按路由选择 GID
 --selftest                单进程 verbs 自测模式，不依赖 RDMA CM
+--client-dev NAME         selftest client/initiator RDMA 设备名
+--server-dev NAME         selftest server/responder RDMA 设备名
 --dev-a NAME              selftest 发起端 RDMA 设备名
 --dev-b NAME              selftest 响应端 RDMA 设备名
 --verbose                 打印每次操作日志

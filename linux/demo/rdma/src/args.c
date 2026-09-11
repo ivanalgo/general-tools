@@ -64,8 +64,10 @@ void print_usage(const char *prog)
             "      --gid-index N     selftest GID index, default 0; RDMA CM mode uses route-selected GID\n"
             "      --cq-depth N      CQ/SQ/RQ depth, default 64\n"
             "      --cm-timeout-ms N RDMA CM event timeout, default 5000 ms\n"
-            "      --dev-a NAME      selftest initiator RDMA device\n"
-            "      --dev-b NAME      selftest responder RDMA device\n"
+            "      --client-dev NAME selftest client/initiator RDMA device\n"
+            "      --server-dev NAME selftest server/responder RDMA device\n"
+            "      --dev-a NAME      compatibility alias of --client-dev\n"
+            "      --dev-b NAME      compatibility alias of --server-dev\n"
             "  -v, --verbose         print progress for every operation\n"
             "  -h, --help            show this help\n",
             prog, prog, prog);
@@ -104,6 +106,8 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         {"dev-a", required_argument, NULL, 1003},
         {"dev-b", required_argument, NULL, 1004},
         {"cm-timeout-ms", required_argument, NULL, 1005},
+        {"client-dev", required_argument, NULL, 1007},
+        {"server-dev", required_argument, NULL, 1008},
         {"verbose", no_argument, NULL, 'v'},
         {"help", no_argument, NULL, 'h'},
         {NULL, 0, NULL, 0},
@@ -136,6 +140,8 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
         case 1003: opt->dev_a = optarg; break;
         case 1004: opt->dev_b = optarg; break;
         case 1005: opt->cm_timeout_ms = atoi(optarg); break;
+        case 1007: opt->dev_a = optarg; break;
+        case 1008: opt->dev_b = optarg; break;
         case 'v': opt->verbose++; break;
         case 'h': print_usage(argv[0]); exit(0);
         default: return -1;
