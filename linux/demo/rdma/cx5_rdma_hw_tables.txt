@@ -96,29 +96,41 @@ ConnectX-5 RDMA 硬件资源表全景大图
 
 
 ====================================================================================================
-                                      3. QPC 表及其左边界出线
+                                      3. QPC 表及其关联图示
 ====================================================================================================
 
-                                                        +----------------------------------------------------------------------------------+
-                                                        | [NIC] QPC Table - Queue Pair Context Table                                       |
-                                                        |----------------------------------------------------------------------------------|
-                                                        | +------------------------------------------------+   [...]   +------------------+ |
-                                                        | | QPC_entry[0]                                   |           | QPC_entry[N]     | |
-                                                        | | - qpn = 0                                      |           | - qpn = N         | |
-                                                        | | - transport = RC / UC / UD / RAW               |           | - transport       | |
-                                                        | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state           | |
-[NIC] PD Table (pdn)                                <---| | - pdn                                          |           | - pdn             | |
-                                                        | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attrs    | |
-                                                        | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs      | |
-[DRAM] SQ WQE Ring Table (sq_wq_ptr)                <---| | - sq_wq_ptr                                    |           | - sq_wq_ptr       | |
-[DRAM] RQ WQE Ring Table (rq_wq_ptr)                <---| | - rq_wq_ptr                                    |           | - rq_wq_ptr       | |
-[NIC] CQC Table (send_cqn)                          <---| | - send_cqn                                     |           | - send_cqn        | |
-[NIC] CQC Table (recv_cqn)                          <---| | - recv_cqn                                     |           | - recv_cqn        | |
-[DRAM] Doorbell Record Table (sq_dbr_ptr)           <---| | - sq_dbr_ptr                                   |           | - sq_dbr_ptr      | |
-[DRAM] Doorbell Record Table (rq_dbr_ptr)           <---| | - rq_dbr_ptr                                   |           | - rq_dbr_ptr      | |
-[NIC] TIS Table (tisn)                              <---| | - tisn                                         |           | - tisn            | |
-                                                        | +------------------------------------------------+           +------------------+ |
-                                                        +----------------------------------------------------------------------------------+
+  下图示例把 QPC 作为硬件侧表放在左边，把它直接关联的 DRAM WQE Ring 画在右边；QPC 字段行用字段名箭头接到右侧表。
+
+  +--------------------------------------------------------------------------------------------------+
+  | [NIC] QPC Table - Queue Pair Context Table                                                       |
+  |--------------------------------------------------------------------------------------------------|
+  | +------------------------------------------------+   [...]   +------------------+                 |
+  | | QPC_entry[0]                                   |           | QPC_entry[N]     |                 |
+  | | - qpn = 0                                      |           | - qpn = N         |                 |
+  | | - transport = RC / UC / UD / RAW               |           | - transport       |                 |
+  | | - state = RESET / INIT / RTR / RTS / ERR       |           | - state           |                 |
+  | | - pdn                                          |           | - pdn             | <--- [NIC] PD Table (pdn)
+  | | - remote_qpn / mtu / psn / retry / timeout     |           | - remote attrs    |                 |
+  | | - RoCE path attrs: SGID/DGID/SL/UDP sport      |           | - path attrs      |                 |
+  | | - sq_wq_ptr                                    |           | - sq_wq_ptr       | -- sq_wq_ptr --> +-----------------------------------------------+
+  | |                                                |           |                  |                 |                  | [DRAM] SQ WQE Ring Table                       |
+  | |                                                |           |                  |                 |                  |-----------------------------------------------|
+  | |                                                |           |                  |                 |                  | SQ_WQE[0] ... SQ_WQE[N]                        |
+  | |                                                |           |                  |                 |                  | - opcode / local SGE / lkey                    |
+  | |                                                |           |                  |                 |                  +-----------------------------------------------+
+  | | - rq_wq_ptr                                    |           | - rq_wq_ptr       | -- rq_wq_ptr --> +-----------------------------------------------+
+  | |                                                |           |                  |                 |                  | [DRAM] RQ WQE Ring Table                       |
+  | |                                                |           |                  |                 |                  |-----------------------------------------------|
+  | |                                                |           |                  |                 |                  | RQ_WQE[0] ... RQ_WQE[N]                        |
+  | |                                                |           |                  |                 |                  | - receive SGE / lkey                           |
+  | |                                                |           |                  |                 |                  +-----------------------------------------------+
+  | | - send_cqn                                     |           | - send_cqn        | <--- [NIC] CQC Table (send_cqn)
+  | | - recv_cqn                                     |           | - recv_cqn        | <--- [NIC] CQC Table (recv_cqn)
+  | | - sq_dbr_ptr                                   |           | - sq_dbr_ptr      | <--- [DRAM] Doorbell Record Table (sq_dbr_ptr)
+  | | - rq_dbr_ptr                                   |           | - rq_dbr_ptr      | <--- [DRAM] Doorbell Record Table (rq_dbr_ptr)
+  | | - tisn                                         |           | - tisn            | <--- [NIC] TIS Table (tisn)
+  | +------------------------------------------------+           +------------------+                 |
+  +--------------------------------------------------------------------------------------------------+
 
 
 ====================================================================================================
