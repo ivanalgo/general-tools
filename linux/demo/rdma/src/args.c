@@ -52,8 +52,8 @@ void print_usage(const char *prog)
             "  %s --client --addr <server-ip> [--bind-addr <local-ip>] [--port 7471]\n"
             "  %s --selftest [--dev-a rxe0 --dev-b rxe1] [--mode send|write|read|all]\n"
             "Options:\n"
-            "  -s, --server          run as RDMA CM server/listener\n"
-            "  -c, --client          run as RDMA CM client/connector\n"
+            "  -s, --server          run as server; with --server-dev uses TCP control + raw verbs\n"
+            "  -c, --client          run as client; with --client-dev uses TCP control + raw verbs\n"
             "      --selftest        run one-process verbs test without RDMA CM\n"
             "  -a, --addr ADDR       server IPv4/IPv6 address for client\n"
             "      --bind-addr ADDR  local IPv4/IPv6 address used by RDMA CM to select netdev/RDMA device\n"
@@ -61,11 +61,11 @@ void print_usage(const char *prog)
             "  -m, --mode MODE       send/write/read/all, default all\n"
             "  -z, --size SIZE       bytes per operation, supports K/M suffix, default 4096\n"
             "  -n, --iters N         iterations per selected operation, default 10\n"
-            "      --gid-index N     selftest GID index, default 0; RDMA CM mode uses route-selected GID\n"
+            "      --gid-index N     raw verbs/selftest GID index, default 0; RDMA CM uses route-selected GID\n"
             "      --cq-depth N      CQ/SQ/RQ depth, default 64\n"
             "      --cm-timeout-ms N RDMA CM event timeout, default 5000 ms\n"
-            "      --client-dev NAME selftest client/initiator RDMA device\n"
-            "      --server-dev NAME selftest server/responder RDMA device\n"
+            "      --client-dev NAME client/initiator RDMA device for raw verbs or selftest\n"
+            "      --server-dev NAME server/responder RDMA device for raw verbs or selftest\n"
             "      --dev-a NAME      compatibility alias of --client-dev\n"
             "      --dev-b NAME      compatibility alias of --server-dev\n"
             "  -v, --verbose         print progress for every operation\n"
@@ -169,7 +169,7 @@ int parse_options(int argc, char **argv, struct demo_options *opt)
                 (size_t)RDMA_DEMO_MAX_PAYLOAD);
         return -1;
     }
-    if (opt->gid_index >= 0 && opt->role != ROLE_SELFTEST) {
+    if (opt->gid_index >= 0 && opt->role != ROLE_SELFTEST && !opt->dev_a && !opt->dev_b) {
         fprintf(stderr,
                 "note: --gid-index=%d is documented for ibv examples; this RDMA-CM demo "
                 "keeps CM route-selected GID. Configure rxe/route instead.\n",

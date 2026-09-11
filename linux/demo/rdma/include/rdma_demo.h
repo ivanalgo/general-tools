@@ -92,6 +92,8 @@ const char *mode_name(enum demo_mode mode);
 int run_server(const struct demo_options *opt);
 int run_client(const struct demo_options *opt);
 int run_verbs_selftest(const struct demo_options *opt);
+int run_verbs_socket_server(const struct demo_options *opt);
+int run_verbs_socket_client(const struct demo_options *opt);
 
 void rdma_resources_init(struct rdma_resources *res, int verbose);
 void rdma_resources_set_cm_timeout(struct rdma_resources *res, int timeout_ms);

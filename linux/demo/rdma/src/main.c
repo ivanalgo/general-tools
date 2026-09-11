@@ -198,6 +198,10 @@ static int client_read_test(struct rdma_resources *res, size_t size, int iters)
 
 int run_server(const struct demo_options *opt)
 {
+    if (opt->dev_b || opt->dev_a) {
+        return run_verbs_socket_server(opt);
+    }
+
     struct rdma_resources res;
     rdma_resources_init(&res, opt->verbose);
     rdma_resources_set_cm_timeout(&res, opt->cm_timeout_ms);
@@ -222,6 +226,10 @@ out:
 
 int run_client(const struct demo_options *opt)
 {
+    if (opt->dev_a || opt->dev_b) {
+        return run_verbs_socket_client(opt);
+    }
+
     struct rdma_resources res;
     rdma_resources_init(&res, opt->verbose);
     rdma_resources_set_cm_timeout(&res, opt->cm_timeout_ms);

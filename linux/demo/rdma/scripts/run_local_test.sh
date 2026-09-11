@@ -17,6 +17,7 @@ CLIENT_RDMA_DEV="${CLIENT_RDMA_DEV:-${DEV_A:-rxe_demo0}}"
 SERVER_RDMA_DEV="${SERVER_RDMA_DEV:-${DEV_B:-rxe_demo1}}"
 GID_INDEX="${GID_INDEX:-0}"
 USE_CM="${USE_CM:-0}"
+SELFTEST="${SELFTEST:-0}"
 SHOW_IBV_WARNINGS="${SHOW_IBV_WARNINGS:-0}"
 ALLOW_SAME_DEV="${ALLOW_SAME_DEV:-0}"
 
@@ -114,15 +115,40 @@ run_one_cm_case() {
   echo "[PASS] RDMA-CM mode=$mode verified data movement"
 }
 
+run_one_verbs_socket_case() {
+  local mode="$1"
+  local server_args=(--server --bind-addr "$SERVER_BIND_ADDR" --server-dev "$SERVER_RDMA_DEV" \
+    --port "$PORT" --size "$SIZE" --iters "$ITERS" --gid-index "$GID_INDEX")
+  local client_args=(--client --bind-addr "$CLIENT_BIND_ADDR" --addr "$ADDR" \
+    --client-dev "$CLIENT_RDMA_DEV" --port "$PORT" --mode "$mode" --size "$SIZE" \
+    --iters "$ITERS" --gid-index "$GID_INDEX")
+
+  echo "[RUN] raw-verbs mode=$mode client=$CLIENT_BIND_ADDR/$CLIENT_RDMA_DEV server=$SERVER_BIND_ADDR/$SERVER_RDMA_DEV port=$PORT"
+  run_demo "${server_args[@]}" &
+  local server_pid=$!
+  trap "kill $server_pid >/dev/null 2>&1 || true" EXIT
+  sleep 1
+  run_demo "${client_args[@]}"
+  wait "$server_pid"
+  trap - EXIT
+  echo "[PASS] raw-verbs mode=$mode verified data movement"
+}
+
 if [[ "$USE_CM" == "1" ]]; then
   for mode in "${case_list[@]}"; do
     run_one_cm_case "$mode"
+  done
+elif [[ "$SELFTEST" == "1" ]]; then
+  # RXE 设备刚创建后 GID/neighbor 状态可能需要极短时间稳定。
+  sleep "${SETTLE_SECONDS:-2}"
+  for mode in "${case_list[@]}"; do
+    run_one_selftest_case "$mode"
   done
 else
   # RXE 设备刚创建后 GID/neighbor 状态可能需要极短时间稳定。
   sleep "${SETTLE_SECONDS:-2}"
   for mode in "${case_list[@]}"; do
-    run_one_selftest_case "$mode"
+    run_one_verbs_socket_case "$mode"
   done
 fi
 
