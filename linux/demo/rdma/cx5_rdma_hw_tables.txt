@@ -116,15 +116,15 @@ rq_dbr_ptr   <---| | - rq_dbr_ptr                                   |           
 tisn         <---| | - tisn                                         |           | - tisn            | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |    |    |    |    |    |    |
-                   |    |    |    |    |    |    |    +---> [NIC]  TIS Table
-                   |    |    |    |    |    |    +--------> [DRAM] Doorbell Record Table
-                   |    |    |    |    |    +-------------> [DRAM] Doorbell Record Table
-                   |    |    |    |    +------------------> [NIC]  CQC Table
-                   |    |    |    +-----------------------> [NIC]  CQC Table
-                   |    |    +----------------------------> [DRAM] RQ WQE Ring Table
-                   |    +---------------------------------> [DRAM] SQ WQE Ring Table
-                   +--------------------------------------> [NIC]  PD Table
+                 | |    |    |    |    |    |    |    |
+                 | |    |    |    |    |    |    |    +---> [NIC]  TIS Table
+                 | |    |    |    |    |    |    +--------> [DRAM] Doorbell Record Table
+                 | |    |    |    |    |    +-------------> [DRAM] Doorbell Record Table
+                 | |    |    |    |    +------------------> [NIC]  CQC Table
+                 | |    |    |    +-----------------------> [NIC]  CQC Table
+                 | |    |    +----------------------------> [DRAM] RQ WQE Ring Table
+                 | |    +---------------------------------> [DRAM] SQ WQE Ring Table
+                 | +--------------------------------------> [NIC]  PD Table
 
 
 ====================================================================================================
@@ -143,12 +143,12 @@ remote_key   <---| | - remote_addr / rkey for RDMA READ/WRITE       |           
                  | | - ctrl segment / data segment / inline         |           | - ctrl/data       | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |
-                   |    +---> remote packet carries rkey/address
-                   |              |
-                   |              +===> remote CX5 checks remote [NIC] MPT/MKey Table
-                   |
-                   +----------> [NIC] MPT/MKey Table
+                 | |    |
+                 | |    +---> remote packet carries rkey/address
+                 | |              |
+                 | |              +===> remote CX5 checks remote [NIC] MPT/MKey Table
+                 | |
+                 | +----------> [NIC] MPT/MKey Table
                                   |
                                   | local lkey translation for DMA read/write
                                   v
@@ -167,8 +167,8 @@ remote_key   <---| | - remote_addr / rkey for RDMA READ/WRITE       |           
 lkey         <---| | - lkey                                         |           | - lkey            | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |
-                   +----------> [NIC] MPT/MKey Table
+                 | |
+                 | +----------> [NIC] MPT/MKey Table
                                   |
                                   | posted receive buffer translation
                                   v
@@ -192,10 +192,10 @@ pdn          <---| | - pdn                                          |           
 translation  <---| | - translation_ptr                              |           | - translation_ptr | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |
-                   |    +-------> [DRAM] MTT/KLM Table
-                   |
-                   +------------> [NIC]  PD Table
+                 | |    |
+                 | |    +-------> [DRAM] MTT/KLM Table
+                 | |
+                 | +------------> [NIC]  PD Table
 
 
 ====================================================================================================
@@ -211,8 +211,8 @@ dma_pa       <---| | - dma_pa/page_pa     |                   | - dma_pa/page_pa
                  | | - len / perms        |                   | - len / perms        |              |
                  | +----------------------+                   +----------------------+              |
                  +----------------------------------------------------------------------------------+
-                   |
-                   +----------> [DRAM] User Registered Memory Pages
+                 | |
+                 | +----------> [DRAM] User Registered Memory Pages
                                   |
                                   | DMA physical address
                                   v
@@ -249,12 +249,12 @@ eqn          <---| | - eqn                                          |           
                  | | - arm state / moderation / period / count      |           | - moderation      | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |    |
-                   |    |    +-------> [NIC]  EQC Table
-                   |    |
-                   |    +------------> [DRAM] Doorbell Record Table
-                   |
-                   +-----------------> [DRAM] CQE Ring Table
+                 | |    |    |
+                 | |    |    +-------> [NIC]  EQC Table
+                 | |    |
+                 | |    +------------> [DRAM] Doorbell Record Table
+                 | |
+                 | +-----------------> [DRAM] CQE Ring Table
                                       |
                                       | hardware writes completion entries
                                       v
@@ -293,10 +293,10 @@ eq_dbr_ptr   <---| | - eq_dbr_ptr                                   |           
                  | | - event mask / interrupt moderation            |           | - event attrs     | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |
-                   |    +-------> [DRAM] Doorbell Record Table
-                   |
-                   +------------> [DRAM] EQE Ring Table
+                 | |    |
+                 | |    +-------> [DRAM] Doorbell Record Table
+                 | |
+                 | +------------> [DRAM] EQE Ring Table
                                 |
                                 | hardware writes async/completion events
                                 v
@@ -353,11 +353,11 @@ eq_db        <---| | - EQ doorbell register                          |          
 blueflame    <---| | - BlueFlame write-combining area                |           | - BlueFlame area  | |
                  | +------------------------------------------------+           +------------------+ |
                  +----------------------------------------------------------------------------------+
-                   |    |    |    |
-                   |    |    |    +====> [NIC] inline WQE ingestion
-                   |    |    +=========> [NIC] EQC event logic
-                   |    +==============> [NIC] CQC arm logic
-                   +===================> [NIC] QPC / SQ scheduler
+                 | |    |    |    |
+                 | |    |    |    +====> [NIC] inline WQE ingestion
+                 | |    |    +=========> [NIC] EQC event logic
+                 | |    +==============> [NIC] CQC arm logic
+                 | +===================> [NIC] QPC / SQ scheduler
 
 
 ====================================================================================================
