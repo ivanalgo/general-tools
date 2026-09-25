@@ -1,0 +1,4 @@
+interface:
+  display_name: "美股长期投资研究"
+  short_description: "研究美股行业趋势、公司基本面、估值条件与长期候选清单"
+  default_prompt: "Use $us-stock-long-term-research 生成今天的美股长期投资观察清单，并说明行业趋势、公司近况、估值条件与主要风险。"
